@@ -272,17 +272,19 @@ pytest -m live                  # real APIs (keys from .env; providers without a
 
 ### Branches and pipeline
 
+A single long-lived branch, `main`. Each change is made on a short-lived branch (`feature/…`, `fix/…`, `docs/…`) and merged into `main` through a PR.
+
 ```
-dev ──PR──▶ qualif ──PR──▶ main ──tag vX.Y.Z──▶ release
+main ──▶ feature/xxx ──PR (tests + qualification)──▶ main ──tag vX.Y.Z──▶ release
 ```
 
 | Stage | Trigger | Checks |
 |---|---|---|
-| Test | push or PR on `dev`, `qualif`, `main` | `pytest` on Linux (Python 3.10 to 3.14), Windows and macOS (3.10, 3.14), and with the minimum dependency versions |
-| Qualification | PR to `qualif` or `main` | Package built and installed in a fresh environment, commands tested, then real APIs after approval |
+| Test | push on any branch, PR to `main` | `pytest` on Linux (Python 3.10 to 3.14), Windows and macOS (3.10, 3.14), and with the minimum dependency versions |
+| Qualification | PR to `main` | Package built and installed in a fresh environment, commands tested, then real APIs after approval |
 | Release | `vX.Y.Z` tag on `main` | Tag = `pyproject.toml` version, GitHub Release with the wheel, then TestPyPI and PyPI (if enabled) |
 
-A push to `main` publishes nothing: only a new version (tag) is released. A released version can never be changed.
+`main` is protected: changes only get in through a PR whose tests and qualification are green. A push to `main` publishes nothing: only a new version (tag) is released. A released version can never be changed.
 
 ## License
 

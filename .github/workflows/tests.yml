@@ -1,12 +1,12 @@
-# Tests rapides : à chaque push sur dev / qualif / main et à chaque PR vers ces branches.
-# Sans clé API, sans réseau vers les fournisseurs (les appels sont simulés).
+# Tests rapides : à chaque push, sur toutes les branches (feature/…, fix/…, main),
+# et sur chaque PR vers main. Sans clé API (les appels aux fournisseurs sont simulés).
 name: tests
 
 on:
   push:
-    branches: [dev, qualif, main]
+    branches: ["**"]
   pull_request:
-    branches: [dev, qualif, main]
+    branches: [main]
 
 # Un nouveau push annule les tests encore en cours sur la même branche.
 concurrency:

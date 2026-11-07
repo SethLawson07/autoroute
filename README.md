@@ -270,17 +270,19 @@ pytest -m live                  # vraies API (clés de .env ; fournisseur sans c
 
 ### Branches et pipeline
 
+Une seule branche permanente, `main`. Chaque modification se fait sur une branche courte (`feature/…`, `fix/…`, `docs/…`), fusionnée dans `main` par une PR.
+
 ```
-dev ──PR──▶ qualif ──PR──▶ main ──tag vX.Y.Z──▶ publication
+main ──▶ feature/xxx ──PR (tests + qualification)──▶ main ──tag vX.Y.Z──▶ publication
 ```
 
 | Étape | Déclencheur | Vérifications |
 |---|---|---|
-| Test | push ou PR sur `dev`, `qualif`, `main` | `pytest` sous Linux (Python 3.10 à 3.14), Windows et macOS (3.10, 3.14), et avec les versions minimales des dépendances |
-| Qualification | PR vers `qualif` ou `main` | Paquet construit et installé dans un environnement neuf, commandes testées, puis vraies API après approbation |
+| Test | push sur n'importe quelle branche, PR vers `main` | `pytest` sous Linux (Python 3.10 à 3.14), Windows et macOS (3.10, 3.14), et avec les versions minimales des dépendances |
+| Qualification | PR vers `main` | Paquet construit et installé dans un environnement neuf, commandes testées, puis vraies API après approbation |
 | Publication | tag `vX.Y.Z` sur `main` | Tag = version de `pyproject.toml`, Release GitHub avec le wheel, puis TestPyPI et PyPI (si activé) |
 
-Un push sur `main` ne publie rien : seule une nouvelle version (tag) est publiée. Une version publiée ne peut plus être modifiée.
+`main` est protégée : on n'y entre que par une PR dont les tests et la qualification sont verts. Un push sur `main` ne publie rien : seule une nouvelle version (tag) est publiée. Une version publiée ne peut plus être modifiée.
 
 ## Licence
 

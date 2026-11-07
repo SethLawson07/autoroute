@@ -28,7 +28,7 @@ jobs:
           echo "pyproject.toml : $version / tag : ${GITHUB_REF_NAME}"
           test "v$version" = "${GITHUB_REF_NAME}"
 
-      - name: Le tag est sur main (code passé par dev et qualif)
+      - name: Le tag est sur main (code entré par une PR qualifiée)
         run: git merge-base --is-ancestor "$GITHUB_SHA" origin/main
 
   build:

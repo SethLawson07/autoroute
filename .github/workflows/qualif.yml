@@ -1,11 +1,11 @@
-# Qualification : sur chaque PR vers qualif ou main (et à la demande).
+# Qualification : sur chaque PR vers main (et à la demande).
 # Vérifie Autoroute « comme un utilisateur » : paquet construit, installé hors du dépôt,
 # commandes testées, puis vraies API (après approbation, avec les secrets GitHub).
 name: qualif
 
 on:
   pull_request:
-    branches: [qualif, main]
+    branches: [main]
   workflow_dispatch:
 
 concurrency:
