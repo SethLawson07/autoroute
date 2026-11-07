@@ -50,3 +50,16 @@ jobs:
       - run: uv venv
       - run: uv pip install --resolution lowest-direct -e ".[dev]"
       - run: uv run --no-sync pytest
+
+  tests-ok:
+    # Seul check à exiger dans la protection des branches : il ne réussit que si tous les
+    # jobs ci-dessus ont réussi (un job ajouté plus tard doit être ajouté dans « needs »).
+    name: tests OK
+    if: always()
+    needs: [test, lowest]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Tous les jobs ont réussi
+        run: |
+          echo '${{ toJSON(needs.*.result) }}'
+          test "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped') }}" = "false"
