@@ -1,0 +1,52 @@
+# Tests rapides : à chaque push sur dev / qualif / main et à chaque PR vers ces branches.
+# Sans clé API, sans réseau vers les fournisseurs (les appels sont simulés).
+name: tests
+
+on:
+  push:
+    branches: [dev, qualif, main]
+  pull_request:
+    branches: [dev, qualif, main]
+
+# Un nouveau push annule les tests encore en cours sur la même branche.
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: pytest (${{ matrix.os }}, Python ${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false  # voir tous les échecs, pas seulement le premier
+      matrix:
+        # Toutes les versions de Python sous Linux ; la plus ancienne et la plus récente
+        # sous Windows et macOS (chemins de fichiers, encodage).
+        os: [ubuntu-latest]
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+        include:
+          - { os: windows-latest, python-version: "3.10" }
+          - { os: windows-latest, python-version: "3.14" }
+          - { os: macos-latest, python-version: "3.10" }
+          - { os: macos-latest, python-version: "3.14" }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: pip install -e ".[dev]"
+      - run: pytest
+
+  lowest:
+    # Vérifie les versions minimales de pyproject.toml : installe exactement les plus
+    # anciennes versions autorisées. Si ce job échoue, un minimum est trop bas.
+    name: pytest (versions minimales des dépendances)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.10"
+      - run: uv venv
+      - run: uv pip install --resolution lowest-direct -e ".[dev]"
+      - run: uv run --no-sync pytest
