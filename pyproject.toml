@@ -1,0 +1,46 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "autoroute"
+version = "0.1.0"
+description = "Choisit automatiquement le bon modèle LLM pour une tâche"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+keywords = ["llm", "routing", "langchain", "openai", "anthropic", "gemini", "mistral"]
+# Versions minimales seulement, pas de borne haute (bibliothèque) : à vérifier en CI
+# avec un job « versions minimales » (uv pip install --resolution lowest-direct).
+dependencies = [
+  "typer>=0.13",                  # annotations « str | None » sous Python 3.10 (0.12 échoue)
+  "pyyaml>=6.0",
+  "pydantic>=2",
+  "python-dotenv>=1.0",
+  "httpx>=0.27",
+  "langchain>=1.0",               # create_agent, ModelFallbackMiddleware
+  "langchain-core>=1.2.5",        # < 1.2.5 incompatible avec langgraph-checkpoint récent (agents)
+  "langchain-openai>=1.0",
+  "langchain-anthropic>=1.0",
+  "langchain-google-genai>=3.0",  # première version compatible LangChain 1.0
+  "langchain-mistralai>=1.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[project.urls]
+Homepage = "https://github.com/SethLawson07/autoroute"
+
+[project.scripts]
+autoroute = "autoroute.cli:app"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/autoroute"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Les tests « live » appellent les vraies API : exclus par défaut, lancés avec « pytest -m live ».
+addopts = "-m 'not live'"
+markers = ["live: appelle les vraies API des fournisseurs (clés requises)"]
+filterwarnings = ["ignore::DeprecationWarning:langsmith"]

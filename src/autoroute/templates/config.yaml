@@ -1,0 +1,10 @@
+# Optional. Without this file, Autoroute picks the orchestrator (the model that picks
+# the model) from your API keys.
+# To force the orchestrator of a mode (AUTOROUTE_MODE), uncomment its line.
+# Format: provider:name. It must be reachable with one of your API keys.
+orchestrators:
+  # all: anthropic:claude-haiku-5-5
+  # openai: openai:gpt-4o-mini
+  # anthropic: anthropic:claude-haiku-5-5
+  # gemini: google_genai:gemini-2.5-flash
+  # sovereign: mistralai:mistral-small-latest

@@ -1,0 +1,14 @@
+.venv/
+.env
+__pycache__/
+*.egg-info/
+*.log
+# Config et log locaux du mainteneur (le log contient le texte des tâches).
+# L'exemple de config est dans src/autoroute/templates/.
+/.autoroute/
+.pytest_cache/
+dist/
+site/
+# Notes de travail privées (consignes pour Claude Code, feuille de route)
+/claude.md
+/CLAUDE.md
