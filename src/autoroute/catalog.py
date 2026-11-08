@@ -5,7 +5,7 @@ import warnings
 import httpx
 
 from autoroute.config import (
-    ENV_KEYS, LIGHT_FAMILIES, MODES, Config, ModelConfig, get_api_key, load_orchestrator,
+    ENV_KEYS, LIGHT_FAMILIES, MODES, Config, ModelConfig, get_api_key, get_mode, load_orchestrator,
 )
 
 SUPPORTED = MODES["all"]
@@ -20,6 +20,7 @@ _OPENAI_EXCLUDE = (
 _GEMINI_EXCLUDE = (
     "embedding", "imagen", "tts", "image", "live", "audio",
     "aqa", "veo", "learnlm", "robotics",
+    "latest",  # alias listés par l'API mais refusés via LangChain (404 « API version v1 »)
 )
 
 def list_models(provider: str) -> list[str]:
@@ -167,19 +168,26 @@ def _pick_orchestrators(mode: str, models: list[ModelConfig]) -> list[str]:
     Un fournisseur après l'autre (ordre du mode), pour qu'une panne chez l'un laisse un
     orchestrateur chez un autre. Aucun nom figé : la liste suit l'évolution des fournisseurs.
     """
+    return pick_spread(models, MODES[mode], MAX_ORCHESTRATORS)
+
+
+def pick_spread(models: list[ModelConfig], providers, limit: int) -> list[str]:
+    """Jusqu'à `limit` modèles, petits modèles d'abord, un fournisseur après l'autre."""
     ranked = {
         p: sorted((m for m in models if m.provider == p), key=_orchestrator_rank)
-        for p in MODES[mode]
+        for p in providers
     }
     picked: list[str] = []
-    while len(picked) < MAX_ORCHESTRATORS and any(ranked.values()):
-        for p in MODES[mode]:
-            if ranked[p] and len(picked) < MAX_ORCHESTRATORS:
+    while len(picked) < limit and any(ranked.values()):
+        for p in providers:
+            if ranked[p] and len(picked) < limit:
                 picked.append(ranked[p].pop(0).spec)
     return picked
 
 
-def discover_config(path: str | None = None, mode: str = "all") -> Config:
+def discover_config(path: str | None = None, mode: str | None = None) -> Config:
+    """Modèles découverts et orchestrateurs. Sans `mode`, respecte AUTOROUTE_MODE (souveraineté)."""
+    mode = mode or get_mode()
     wanted = load_orchestrator(path, mode)
     models: list[ModelConfig] = []
     errors: list[str] = []

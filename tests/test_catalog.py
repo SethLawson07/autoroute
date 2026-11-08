@@ -37,6 +37,16 @@ def test_openai_filter_keeps_only_chat_models(monkeypatch):
     assert catalog.list_chat_models("openai") == ["gpt-4o", "o3"]
 
 
+def test_gemini_filter_drops_latest_aliases(monkeypatch):
+    # Les alias « -latest » de Gemini répondent 404 via LangChain : ni orchestrateur ni choix final.
+    monkeypatch.setattr(
+        catalog,
+        "list_models",
+        lambda provider: ["gemini-3.8-flash", "gemini-flash-latest", "gemini-flash-lite-latest", "gemini-pro-latest"],
+    )
+    assert catalog.list_chat_models("google_genai") == ["gemini-3.8-flash"]
+
+
 def test_resolve_by_name():
     assert catalog._resolve_orchestrator("gpt-4o-mini", models()) == "openai:gpt-4o-mini"
 

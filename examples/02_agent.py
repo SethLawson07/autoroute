@@ -11,7 +11,7 @@ def get_weather(city: str) -> str:
     return f"Il fait grand soleil à {city}."
 
 
-task = "Quel temps fait-il à Vannes ?"
+task = "Quel temps fait-il à Paris ?"
 
 r = route_with_reason(task)
 primary, *backups = r.candidates

@@ -3,10 +3,10 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "autoroute"
-version = "0.1.0"
+name = "autoroute-ai"  # nom PyPI (« autoroute » y est bloqué, trop proche de « auto-route ») ; import : autoroute
+version = "0.1.1"
 description = "Choisit automatiquement le bon modèle LLM pour une tâche"
-readme = "README.md"
+readme = "README.en.md"  # PyPI : version anglaise ; GitHub affiche README.md (français)
 license = "MIT"
 requires-python = ">=3.10"
 keywords = ["llm", "routing", "langchain", "openai", "anthropic", "gemini", "mistral"]

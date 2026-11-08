@@ -108,9 +108,7 @@ def models():
 def route_cmd(task: str):
     """Affiche le modèle choisi pour une tâche, et pourquoi."""
     with _cli():
-        result = route_with_reason(task)
-        if result.routing_failed:
-            typer.echo("Attention : routage impossible, détail de l'erreur dans le log.", err=True)
+        result = route_with_reason(task)  # les échecs d'orchestrateur sont affichés en avertissement
         typer.echo(f"Modèle : {result.model}")
         typer.echo(f"Raison : {result.reason}")
         if len(result.candidates) > 1:

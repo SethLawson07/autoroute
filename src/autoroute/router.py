@@ -1,10 +1,11 @@
 import time
+import warnings
 from uuid import uuid4
 
 from langchain.chat_models import init_chat_model
 from pydantic import BaseModel, Field
 
-from autoroute.catalog import discover_config
+from autoroute.catalog import discover_config, pick_spread
 from autoroute.config import Config, ModelConfig, get_mode
 from autoroute.observability import OutcomeTracker, log_decision
 
@@ -61,7 +62,7 @@ def _decision_schema(config: Config) -> dict:
             },
             "reason": {
                 "type": "string",
-                "description": "Pourquoi le premier modèle, en une ou deux phrases.",
+                "description": "Pourquoi le premier modèle, en une ou deux phrases, dans la langue de la tâche.",
             },
         },
         "required": ["choices", "reason"],
@@ -82,7 +83,8 @@ def _build_prompt(task: str, config: Config) -> str:
         "Réponds avec les noms exacts, tels qu'ils apparaissent dans la liste, au format "
         f"fournisseur:nom (champ choices) : le meilleur modèle en premier, puis au plus "
         f"{MAX_CANDIDATES - 1} modèle(s) de repli adapté(s) à la tâche, utilisé(s) si le premier échoue. "
-        "Donne la raison du premier choix (champ reason)."
+        "Donne la raison du premier choix (champ reason), "
+        "rédigée dans la langue de la tâche (ex. en anglais si la tâche est en anglais)."
     )
 
 
@@ -102,6 +104,18 @@ def _ask(orchestrator: str, task: str, config: Config) -> Decision:
         _decision_schema(config), strict=True
     )
     return Decision.model_validate(llm.invoke(_build_prompt(task, config)))
+
+
+def _last_resort(config: Config) -> list[str]:
+    """Modèles renvoyés quand aucun orchestrateur n'a répondu.
+
+    D'abord des modèles découverts qui ne sont pas des orchestrateurs en échec, répartis
+    entre fournisseurs. S'il n'y en a pas, les orchestrateurs eux-mêmes.
+    """
+    failed = set(config.orchestrators)
+    others = [m for m in config.models if m.spec not in failed]
+    providers = list(dict.fromkeys(m.provider for m in config.models))
+    return pick_spread(others, providers, MAX_CANDIDATES) or config.orchestrators[:MAX_CANDIDATES]
 
 
 def _error_text(e: Exception) -> str:
@@ -139,16 +153,18 @@ def route_with_reason(task: str, config: Config | None = None) -> RouteResult:
 
     decision: Decision | None = None
     failures: list[str] = []
+    failed: list[str] = []
     for orchestrator in config.orchestrators:
         try:
             decision = _ask(orchestrator, task, config)
             break
         except Exception as e:
+            failed.append(orchestrator)
             failures.append(f"{orchestrator} : {_error_text(e)}")
 
     if decision is None:
         # Dernier recours : l'application continue avec un modèle découvert.
-        candidates = config.orchestrators[:MAX_CANDIDATES]
+        candidates = _last_resort(config)
         result = RouteResult(
             model=candidates[0],
             reason="Aucun orchestrateur n'a répondu : repli sur un modèle découvert.",
@@ -185,6 +201,17 @@ def route_with_reason(task: str, config: Config | None = None) -> RouteResult:
         mode=mode,
         error=" ; ".join(failures) or None,
     )
+    # Après le log : la décision est écrite même si les avertissements sont traités en erreurs.
+    if result.routing_failed:
+        warnings.warn(
+            f"Aucun orchestrateur n'a répondu ({', '.join(failed)}) : "
+            f"repli sur {result.model}. Détail de l'erreur dans le log."
+        )
+    elif failed:
+        warnings.warn(
+            f"Orchestrateur en échec : {', '.join(failed)}. Secours utilisé : {orchestrator}. "
+            "Détail de l'erreur dans le log."
+        )
     return result
 
 
