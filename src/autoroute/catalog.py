@@ -20,6 +20,7 @@ _OPENAI_EXCLUDE = (
 _GEMINI_EXCLUDE = (
     "embedding", "imagen", "tts", "image", "live", "audio",
     "aqa", "veo", "learnlm", "robotics",
+    "latest",  # alias listés par l'API mais refusés via LangChain (404 « API version v1 »)
 )
 
 def list_models(provider: str) -> list[str]:
