@@ -51,6 +51,12 @@ def test_decision_is_logged(config, fake_llm):
     assert event["routing_failed"] is False
 
 
+def test_prompt_asks_reason_in_task_language(config, fake_llm):
+    fake = fake_llm(Decision(choices=["openai:gpt-4o-mini"], reason="Simple task"))
+    route("Say hello", config)
+    assert "langue de la tâche" in fake.prompt
+
+
 def test_no_warning_when_orchestrator_answers(config, fake_llm, recwarn):
     fake_llm(Decision(choices=["openai:gpt-4o-mini"], reason="Simple"))
     route_with_reason("Dis bonjour", config)

@@ -62,7 +62,7 @@ def _decision_schema(config: Config) -> dict:
             },
             "reason": {
                 "type": "string",
-                "description": "Pourquoi le premier modèle, en une ou deux phrases.",
+                "description": "Pourquoi le premier modèle, en une ou deux phrases, dans la langue de la tâche.",
             },
         },
         "required": ["choices", "reason"],
@@ -83,7 +83,8 @@ def _build_prompt(task: str, config: Config) -> str:
         "Réponds avec les noms exacts, tels qu'ils apparaissent dans la liste, au format "
         f"fournisseur:nom (champ choices) : le meilleur modèle en premier, puis au plus "
         f"{MAX_CANDIDATES - 1} modèle(s) de repli adapté(s) à la tâche, utilisé(s) si le premier échoue. "
-        "Donne la raison du premier choix (champ reason)."
+        "Donne la raison du premier choix (champ reason), "
+        "rédigée dans la langue de la tâche (ex. en anglais si la tâche est en anglais)."
     )
 
 
