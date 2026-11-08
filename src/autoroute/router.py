@@ -1,4 +1,5 @@
 import time
+import warnings
 from uuid import uuid4
 
 from langchain.chat_models import init_chat_model
@@ -151,11 +152,13 @@ def route_with_reason(task: str, config: Config | None = None) -> RouteResult:
 
     decision: Decision | None = None
     failures: list[str] = []
+    failed: list[str] = []
     for orchestrator in config.orchestrators:
         try:
             decision = _ask(orchestrator, task, config)
             break
         except Exception as e:
+            failed.append(orchestrator)
             failures.append(f"{orchestrator} : {_error_text(e)}")
 
     if decision is None:
@@ -197,6 +200,17 @@ def route_with_reason(task: str, config: Config | None = None) -> RouteResult:
         mode=mode,
         error=" ; ".join(failures) or None,
     )
+    # Après le log : la décision est écrite même si les avertissements sont traités en erreurs.
+    if result.routing_failed:
+        warnings.warn(
+            f"Aucun orchestrateur n'a répondu ({', '.join(failed)}) : "
+            f"repli sur {result.model}. Détail de l'erreur dans le log."
+        )
+    elif failed:
+        warnings.warn(
+            f"Orchestrateur en échec : {', '.join(failed)}. Secours utilisé : {orchestrator}. "
+            "Détail de l'erreur dans le log."
+        )
     return result
 
 

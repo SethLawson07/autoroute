@@ -113,3 +113,16 @@ def test_init_rejects_orchestrator_without_provider():
     assert result.exit_code == 1
     assert "fournisseur:nom" in result.output
     assert not CONFIG.exists()
+
+
+def test_route_shows_orchestrator_failure_once(monkeypatch):
+    monkeypatch.setattr(catalog, "list_chat_models", lambda p: [f"{p}-mini", f"{p}-large"])
+
+    def boom(spec, **kw):
+        raise RuntimeError("panne")
+
+    monkeypatch.setattr("autoroute.router.init_chat_model", boom)
+    result = runner.invoke(app, ["route", "Dis bonjour"])
+    assert result.exit_code == 0
+    assert result.output.count("Attention : Aucun orchestrateur n'a répondu") == 1
+    assert "Modèle : " in result.output
