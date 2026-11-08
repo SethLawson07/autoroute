@@ -45,6 +45,8 @@ pip install git+https://github.com/SethLawson07/autoroute
 
 Python 3.10 ou plus. LangChain et les intégrations OpenAI, Anthropic, Google GenAI et Mistral sont installés avec.
 
+Déjà installés dans ton projet ? Les versions récentes sont conservées : Autoroute ne demande que des versions minimales (LangChain 1.0 ou plus). Si ton projet est encore en LangChain 0.x, pip le mettra à jour, ce qui peut changer le comportement de ton code existant.
+
 ## Démarrage rapide
 
 ```powershell
