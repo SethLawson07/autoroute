@@ -96,7 +96,7 @@ jobs:
           # Quelques essais : l'index de TestPyPI met parfois une minute à se mettre à jour.
           for i in 1 2 3 4 5; do
             pip install --index-url https://test.pypi.org/simple/ \
-              --extra-index-url https://pypi.org/simple/ "autoroute==$version" && break
+              --extra-index-url https://pypi.org/simple/ "autoroute-ai==$version" && break
             sleep 30
           done
           mkdir smoke && cd smoke

@@ -34,10 +34,10 @@ Autoroute does **not** call the model: it returns a `provider:name` string that 
 ## Installation
 
 ```bash
-pip install autoroute
+pip install autoroute-ai
 ```
 
-- With uv: `uv add autoroute`
+- With uv: `uv add autoroute-ai`
 - Development version: `pip install git+https://github.com/SethLawson07/autoroute`
 
 Python 3.10 or later. LangChain and the OpenAI, Anthropic, Google GenAI and Mistral integrations are installed with Autoroute.

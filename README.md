@@ -34,10 +34,10 @@ Autoroute n'appelle **pas** le modèle : il te renvoie une chaîne `fournisseur:
 ## Installation
 
 ```bash
-pip install autoroute
+pip install autoroute-ai
 ```
 
-- Avec uv : `uv add autoroute`
+- Avec uv : `uv add autoroute-ai`
 - Version en cours de développement : `pip install git+https://github.com/SethLawson07/autoroute`
 
 Python 3.10 ou plus. LangChain et les intégrations OpenAI, Anthropic, Google GenAI et Mistral sont installés avec Autoroute.
