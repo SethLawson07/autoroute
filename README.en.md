@@ -4,38 +4,30 @@
 
 **Bring your API keys. Autoroute picks the model.**
 
-You describe a task in plain text. Autoroute picks the best LLM among the models **your API keys can access** and returns its name. You don't need to know which model to use for what.
+You give Autoroute your prompt, that is, the task to perform. It picks the most suitable model among those **your API keys can access**, returns its name and tells you why. You don't need to know which model to use for what.
 
 ```python
 from langchain.chat_models import init_chat_model
 from autoroute import route
 
-model = init_chat_model(route("Write a Python function that parses a CSV file"))
+prompt = "Write a Python function that parses a CSV file"
+model = init_chat_model(route(prompt))  # e.g. "anthropic:claude-sonnet-…"
 ```
 
-Autoroute does **not** call the final model. It returns a `provider:name` string that you pass to LangChain.
+- **OpenAI, Anthropic, Gemini, Mistral**: models are discovered with your keys, no list to maintain.
+- **Sovereign mode**: with `AUTOROUTE_MODE=sovereign`, only Mistral models (France) are used. See [Modes](#modes).
+- **Every choice is explained**: the decision and its reason are written to a JSONL log.
+- **Never crashes your application**: backup orchestrators, then fallback to a discovered model.
+
+Autoroute does **not** call the model: it returns a `provider:name` string that you pass to LangChain or to another tool.
 
 ## How it works
 
-```mermaid
-flowchart LR
-    A[Your task] --> B
-    subgraph Autoroute
-        B["route(task)"] --> C[Models discovered with your API keys]
-        C --> D[Orchestrator picks]
-    end
-    D --> E["provider:name + fallbacks"]
-    subgraph YC["Your LangChain code"]
-        F[init_chat_model / create_agent]
-    end
-    E --> F
-    D --> G[(.autoroute/log.jsonl)]
-    F -. "r.tracker()" .-> G
-```
+![How Autoroute works](https://raw.githubusercontent.com/SethLawson07/autoroute/main/assets/how-it-works.en.svg)
 
 1. **Discovery**: Autoroute queries the model-listing API of every provider whose key is set, and keeps the chat models. There is no model list to maintain.
-2. **Routing**: a small **orchestrator** model receives the task and that list. It returns the best model, up to 2 fallbacks, and the reason for its choice. Its answer is restricted to the discovered models.
-3. **Logging**: every decision, and optionally what actually happened when the model was called, is written to a JSONL log.
+2. **Routing**: an **orchestrator**, a small fast model picked automatically among your models (or the one you choose in `.autoroute/config.yaml`), receives your prompt and that list. It returns the most suitable model, up to 2 fallbacks, and the reason for its choice. Its answer is restricted to the discovered models.
+3. **Logging**: every decision is written to a JSONL log. If you pass `r.tracker()` to LangChain, the log also shows which model actually answered (and any fallbacks).
 
 ## Installation
 

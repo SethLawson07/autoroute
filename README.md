@@ -4,38 +4,30 @@
 
 **Apporte tes clés API. Autoroute choisit le modèle.**
 
-Tu décris une tâche en texte libre. Autoroute choisit le meilleur LLM parmi les modèles auxquels **tes clés API donnent accès** et te renvoie son nom. Tu n'as pas à savoir quel modèle utiliser pour quoi.
+Tu donnes à Autoroute ton prompt, c'est-à-dire la tâche à accomplir. Il choisit le modèle le plus adapté parmi ceux auxquels **tes clés API donnent accès**, te renvoie son nom et te dit pourquoi. Tu n'as pas à savoir quel modèle utiliser pour quoi.
 
 ```python
 from langchain.chat_models import init_chat_model
 from autoroute import route
 
-model = init_chat_model(route("Écris une fonction Python qui parse un CSV"))
+prompt = "Écris une fonction Python qui parse un CSV"
+model = init_chat_model(route(prompt))  # ex. "anthropic:claude-sonnet-…"
 ```
 
-Autoroute n'appelle **pas** le modèle final. Il renvoie une chaîne `fournisseur:nom` que tu passes à LangChain.
+- **OpenAI, Anthropic, Gemini, Mistral** : les modèles sont découverts avec tes clés, sans liste à maintenir.
+- **Mode souverain** : avec `AUTOROUTE_MODE=sovereign`, seuls les modèles Mistral (France) sont utilisés. Voir [Modes](#modes).
+- **Chaque choix est expliqué** : la décision et sa raison sont écrites dans un log JSONL.
+- **Ne plante jamais ton application** : orchestrateurs de secours, puis repli sur un modèle découvert.
+
+Autoroute n'appelle **pas** le modèle : il te renvoie une chaîne `fournisseur:nom`, que tu passes à LangChain ou à un autre outil.
 
 ## Comment ça marche
 
-```mermaid
-flowchart LR
-    A[Ta tâche] --> B
-    subgraph Autoroute
-        B["route(tâche)"] --> C[Modèles découverts avec tes clés API]
-        C --> D[L'orchestrateur choisit]
-    end
-    D --> E["fournisseur:nom + replis"]
-    subgraph TC["Ton code LangChain"]
-        F[init_chat_model / create_agent]
-    end
-    E --> F
-    D --> G[(.autoroute/log.jsonl)]
-    F -. "r.tracker()" .-> G
-```
+![Comment fonctionne Autoroute](https://raw.githubusercontent.com/SethLawson07/autoroute/main/assets/how-it-works.fr.svg)
 
 1. **Découverte** : Autoroute interroge l'API de liste des modèles de chaque fournisseur dont la clé est renseignée, et garde les modèles de chat. Il n'y a aucune liste de modèles à maintenir.
-2. **Routage** : un petit modèle **orchestrateur** reçoit la tâche et cette liste. Il renvoie le meilleur modèle, jusqu'à 2 replis, et la raison de son choix. Sa réponse est limitée aux modèles découverts.
-3. **Log** : chaque décision, et en option ce qui s'est réellement passé lors de l'appel au modèle, est écrite dans un log JSONL.
+2. **Routage** : un **orchestrateur**, petit modèle rapide choisi automatiquement parmi tes modèles (ou celui que tu choisis dans `.autoroute/config.yaml`), reçoit ton prompt et cette liste. Il renvoie le modèle le plus adapté, jusqu'à 2 replis, et la raison de son choix. Sa réponse est limitée aux modèles découverts.
+3. **Log** : chaque décision est écrite dans un log JSONL. Si tu passes `r.tracker()` à LangChain, le log indique aussi quel modèle a réellement répondu (et les éventuels replis).
 
 ## Installation
 
