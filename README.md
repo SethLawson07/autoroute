@@ -102,7 +102,7 @@ L'orchestrateur est le modèle qui fait le routage. Tu n'as pas à le choisir, e
 
 `autoroute models` affiche l'orchestrateur retenu et ceux de secours.
 
-**Le routage ne fait pas planter ton application.** Si aucun orchestrateur ne répond (panne, quota), Autoroute renvoie quand même un modèle découvert, avec `routing_failed=True`, et note l'erreur dans le log. Il ne lève une exception que s'il n'a aucun modèle à proposer (aucune clé valide).
+**Le routage ne fait pas planter ton application.** Si aucun orchestrateur ne répond (panne, quota), Autoroute renvoie quand même un modèle découvert (autre que les orchestrateurs en échec, quand c'est possible), avec `routing_failed=True`, et note l'erreur dans le log. Il ne lève une exception que s'il n'a aucun modèle à proposer (aucune clé valide).
 
 ### `.autoroute/config.yaml` (facultatif) : imposer un orchestrateur
 

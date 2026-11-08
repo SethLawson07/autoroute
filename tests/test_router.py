@@ -58,10 +58,31 @@ def test_orchestrator_failure_does_not_raise(config, monkeypatch):
     monkeypatch.setattr("autoroute.router.init_chat_model", boom)
     result = route_with_reason("Une tâche", config)
     assert result.routing_failed is True
-    assert result.model == config.orchestrator  # un modèle découvert, utilisable
+    # Un modèle découvert qui n'est pas l'orchestrateur en échec.
+    assert result.model == "anthropic:claude-sonnet-4-6"
+    assert config.orchestrator not in result.candidates
     event = read_log()[0]
     assert event["routing_failed"] is True
     assert "panne" in event["error"]
+
+
+def test_last_resort_spreads_across_providers(config, monkeypatch):
+    config.models += [
+        ModelConfig(name="gpt-4o", provider="openai"),
+        ModelConfig(name="claude-haiku-4-5", provider="anthropic"),
+    ]
+    monkeypatch.setattr("autoroute.router.init_chat_model", lambda spec, **kw: 1 / 0)
+    result = route_with_reason("Une tâche", config)
+    # Petit modèle d'abord, un fournisseur après l'autre, sans l'orchestrateur en échec.
+    assert result.candidates == ["openai:gpt-4o", "anthropic:claude-haiku-4-5", "anthropic:claude-sonnet-4-6"]
+
+
+def test_last_resort_falls_back_to_orchestrators_when_nothing_else(config, monkeypatch):
+    config.backup_orchestrators = ["anthropic:claude-sonnet-4-6"]  # tous les modèles ont échoué
+    monkeypatch.setattr("autoroute.router.init_chat_model", lambda spec, **kw: 1 / 0)
+    result = route_with_reason("Une tâche", config)
+    assert result.routing_failed is True
+    assert result.candidates == ["openai:gpt-4o-mini", "anthropic:claude-sonnet-4-6"]
 
 
 def test_backup_orchestrator_used_when_first_fails(config, fake_llm, monkeypatch):

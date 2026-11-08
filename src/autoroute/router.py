@@ -4,7 +4,7 @@ from uuid import uuid4
 from langchain.chat_models import init_chat_model
 from pydantic import BaseModel, Field
 
-from autoroute.catalog import discover_config
+from autoroute.catalog import discover_config, pick_spread
 from autoroute.config import Config, ModelConfig, get_mode
 from autoroute.observability import OutcomeTracker, log_decision
 
@@ -104,6 +104,18 @@ def _ask(orchestrator: str, task: str, config: Config) -> Decision:
     return Decision.model_validate(llm.invoke(_build_prompt(task, config)))
 
 
+def _last_resort(config: Config) -> list[str]:
+    """Modèles renvoyés quand aucun orchestrateur n'a répondu.
+
+    D'abord des modèles découverts qui ne sont pas des orchestrateurs en échec, répartis
+    entre fournisseurs. S'il n'y en a pas, les orchestrateurs eux-mêmes.
+    """
+    failed = set(config.orchestrators)
+    others = [m for m in config.models if m.spec not in failed]
+    providers = list(dict.fromkeys(m.provider for m in config.models))
+    return pick_spread(others, providers, MAX_CANDIDATES) or config.orchestrators[:MAX_CANDIDATES]
+
+
 def _error_text(e: Exception) -> str:
     msg = " ".join(str(e).split())
     return f"{type(e).__name__}: {msg[:300]}"
@@ -148,7 +160,7 @@ def route_with_reason(task: str, config: Config | None = None) -> RouteResult:
 
     if decision is None:
         # Dernier recours : l'application continue avec un modèle découvert.
-        candidates = config.orchestrators[:MAX_CANDIDATES]
+        candidates = _last_resort(config)
         result = RouteResult(
             model=candidates[0],
             reason="Aucun orchestrateur n'a répondu : repli sur un modèle découvert.",

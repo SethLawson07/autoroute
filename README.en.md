@@ -104,7 +104,7 @@ The orchestrator is the model that does the routing. You don't pick it, and no m
 
 `autoroute models` shows the chosen orchestrator and the backups.
 
-**Routing never crashes your application.** If no orchestrator answers (outage, quota), Autoroute still returns a discovered model, with `routing_failed=True`, and logs the error. It only raises when it has no model to offer (no valid key).
+**Routing never crashes your application.** If no orchestrator answers (outage, quota), Autoroute still returns a discovered model (other than the failed orchestrators, when possible), with `routing_failed=True`, and logs the error. It only raises when it has no model to offer (no valid key).
 
 ### `.autoroute/config.yaml` (optional): forcing an orchestrator
 
