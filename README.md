@@ -17,6 +17,7 @@ model = init_chat_model(route(prompt))  # ex. "anthropic:claude-sonnet-…"
 - **OpenAI, Anthropic, Gemini, Mistral** : les modèles sont découverts avec tes clés, sans liste à maintenir.
 - **Tes clés restent chez toi** : aucun serveur Autoroute, appels directs aux fournisseurs.
 - **Mode souverain** : avec `AUTOROUTE_MODE=sovereign`, seuls les modèles Mistral (France) sont utilisés. Voir [Modes](#modes).
+- **Le bon prix pour chaque tâche** : un modèle léger pour les tâches simples, un modèle puissant seulement quand il le faut. La mesure du gain n'est pas encore disponible.
 - **Chaque choix est expliqué** : la décision et sa raison sont écrites dans un log JSONL.
 - **Ne plante jamais ton application** : orchestrateurs de secours, puis repli sur un modèle découvert.
 
@@ -27,7 +28,7 @@ Autoroute n'appelle **pas** le modèle : il te renvoie une chaîne `fournisseur:
 ![Comment fonctionne Autoroute](assets/how-it-works.fr.svg)
 
 1. **Découverte** : Autoroute interroge l'API de liste des modèles de chaque fournisseur dont la clé est renseignée, et garde les modèles de chat. Il n'y a aucune liste de modèles à maintenir.
-2. **Routage** : un **orchestrateur**, petit modèle rapide choisi automatiquement parmi tes modèles (ou celui que tu choisis dans `.autoroute/config.yaml`), reçoit ton prompt et cette liste. Il renvoie le modèle le plus adapté, jusqu'à 2 replis, et la raison de son choix. Sa réponse est limitée aux modèles découverts.
+2. **Routage** : un **orchestrateur**, modèle léger choisi automatiquement parmi tes modèles pour que le routage reste rapide et peu coûteux (ou celui que tu choisis dans `.autoroute/config.yaml`), reçoit ton prompt et cette liste. Il renvoie le modèle le plus adapté, jusqu'à 2 replis, et la raison de son choix. Sa réponse est limitée aux modèles découverts.
 3. **Log** : chaque décision est écrite dans un log JSONL. Si tu passes `r.tracker()` à LangChain, le log indique aussi quel modèle a réellement répondu (et les éventuels replis).
 
 ## Installation
@@ -107,7 +108,7 @@ Le mode s'applique aussi à l'orchestrateur : il appartient toujours à un fourn
 
 L'orchestrateur est le modèle qui fait le routage. Tu n'as pas à le choisir, et aucun nom de modèle n'est figé dans le code : Autoroute le prend dans la liste des modèles découverts.
 
-- Il cherche un petit modèle rapide, reconnu à sa famille (`haiku`, `mini`, `flash`, `small`), et prend le plus récent. Quand un fournisseur sort une nouvelle version, elle est prise sans mise à jour d'Autoroute.
+- Il cherche un modèle léger, pour que le routage reste rapide et peu coûteux, reconnu à sa famille (`haiku`, `mini`, `flash`, `small`), et prend le plus récent. Quand un fournisseur sort une nouvelle version, elle est prise sans mise à jour d'Autoroute.
 - Il garde jusqu'à 2 orchestrateurs de secours, si possible chez d'autres fournisseurs, essayés si le premier ne répond pas.
 - Seuls les fournisseurs du mode sont utilisés : en mode `sovereign`, ton prompt n'est jamais envoyé à un modèle autre que Mistral.
 
@@ -300,16 +301,15 @@ Ici, même `decision_id` que ci-dessus : le modèle choisi a atteint sa limite d
   ```python
   from autoroute import route
   from autoroute.catalog import discover_config
-  from autoroute.config import get_mode
 
-  config = discover_config(mode=get_mode())  # une fois, en respectant AUTOROUTE_MODE
-  route(prompt, config)                      # ensuite, sans redécouverte
+  config = discover_config()  # une fois (respecte AUTOROUTE_MODE)
+  route(prompt, config)       # ensuite, sans redécouverte
   ```
 
 - Un fournisseur peut lister un modèle que ta clé ne peut pas appeler : s'il est choisi, les replis prennent le relais.
 - Un seul choix par prompt : pas de re-routage à chaque étape d'un agent.
 - Aucune vérification des capacités du modèle choisi (appel d'outils, vision).
-- Pas encore de calcul de coût : le log enregistre les tokens, pas les prix.
+- Pas encore de calcul de coût ni de mesure du gain : le log enregistre les tokens, pas les prix.
 - Les messages de la CLI sont en français. La raison de l'orchestrateur suit la langue de ton prompt.
 - Seul LangChain est officiellement pris en charge, et le tracker ne fonctionne qu'avec LangChain.
 

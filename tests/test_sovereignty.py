@@ -17,3 +17,12 @@ def test_all_mode_all_providers(monkeypatch):
     fake_discovery(monkeypatch, "openai:openai-model")
     config = catalog.discover_config(mode="all")
     assert {m.provider for m in config.models} == set(catalog.MODES["all"])
+
+
+def test_discover_without_mode_honors_env(monkeypatch):
+    # Sans argument, discover_config respecte AUTOROUTE_MODE : pas de fuite hors de Mistral.
+    fake_discovery(monkeypatch, None)
+    monkeypatch.setenv("AUTOROUTE_MODE", "sovereign")
+    config = catalog.discover_config()
+    assert {m.provider for m in config.models} == {"mistralai"}
+    assert all(o.startswith("mistralai:") for o in config.orchestrators)

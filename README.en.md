@@ -1,6 +1,6 @@
 # Autoroute
 
-🇫🇷 [Français](README.md) · 🇬🇧 **English**
+🇫🇷 [Français](https://github.com/SethLawson07/autoroute/blob/main/README.md) · 🇬🇧 **English**
 
 **Bring your API keys. Autoroute picks the model.**
 
@@ -17,6 +17,7 @@ model = init_chat_model(route(prompt))  # e.g. "anthropic:claude-sonnet-…"
 - **OpenAI, Anthropic, Gemini, Mistral**: models are discovered with your keys, no list to maintain.
 - **Your keys stay with you**: no Autoroute server, direct calls to the providers.
 - **Sovereign mode**: with `AUTOROUTE_MODE=sovereign`, only Mistral models (France) are used. See [Modes](#modes).
+- **The right price for each task**: a lightweight model for simple tasks, a powerful one only when needed. Measuring the savings is not available yet.
 - **Every choice is explained**: the decision and its reason are written to a JSONL log.
 - **Never crashes your application**: backup orchestrators, then fallback to a discovered model.
 
@@ -24,10 +25,10 @@ Autoroute does **not** call the model: it returns a `provider:name` string that 
 
 ## How it works
 
-![How Autoroute works](assets/how-it-works.en.svg)
+![How Autoroute works](https://raw.githubusercontent.com/SethLawson07/autoroute/main/assets/how-it-works.en.svg)
 
 1. **Discovery**: Autoroute queries the model-listing API of every provider whose key is set, and keeps the chat models. There is no model list to maintain.
-2. **Routing**: an **orchestrator**, a small fast model picked automatically among your models (or the one you choose in `.autoroute/config.yaml`), receives your prompt and that list. It returns the most suitable model, up to 2 fallbacks, and the reason for its choice. Its answer is restricted to the discovered models.
+2. **Routing**: an **orchestrator**, a lightweight model picked automatically among your models to keep routing fast and cheap (or the one you choose in `.autoroute/config.yaml`), receives your prompt and that list. It returns the most suitable model, up to 2 fallbacks, and the reason for its choice. Its answer is restricted to the discovered models.
 3. **Logging**: every decision is written to a JSONL log. If you pass `r.tracker()` to LangChain, the log also shows which model actually answered (and any fallbacks).
 
 ## Installation
@@ -107,7 +108,7 @@ The mode also applies to the orchestrator: it always belongs to a provider of th
 
 The orchestrator is the model that does the routing. You don't pick it, and no model name is hard-coded: Autoroute takes it from the list of discovered models.
 
-- It looks for a small, fast model, recognized by its family (`haiku`, `mini`, `flash`, `small`), and takes the newest. When a provider releases a new version, it is used without updating Autoroute.
+- It looks for a lightweight model, to keep routing fast and cheap, recognized by its family (`haiku`, `mini`, `flash`, `small`), and takes the newest. When a provider releases a new version, it is used without updating Autoroute.
 - It keeps up to 2 backup orchestrators, from other providers when possible, tried if the first one doesn't answer.
 - Only the mode's providers are used, so `sovereign` mode never sends your prompt to a non-Mistral model.
 
@@ -223,7 +224,7 @@ Any tool in the LangChain ecosystem that accepts a chat model (LangGraph, Deep A
 
 ### Examples
 
-See [`examples/`](examples):
+See [`examples/`](https://github.com/SethLawson07/autoroute/tree/main/examples):
 
 | File | Shows |
 |---|---|
@@ -300,23 +301,22 @@ Same `decision_id` as above: the chosen model hit its rate limit, and the first 
   ```python
   from autoroute import route
   from autoroute.catalog import discover_config
-  from autoroute.config import get_mode
 
-  config = discover_config(mode=get_mode())  # once, honoring AUTOROUTE_MODE
-  route(prompt, config)                      # then, without rediscovery
+  config = discover_config()  # once (honors AUTOROUTE_MODE)
+  route(prompt, config)       # then, without rediscovery
   ```
 
 - A provider may list a model your key cannot call: if it is chosen, the fallbacks take over.
 - One choice per prompt: no re-routing at each step of an agent.
 - No check of the chosen model's capabilities (tool calling, vision).
-- No cost calculation yet: the log records tokens, not prices.
+- No cost calculation or savings measurement yet: the log records tokens, not prices.
 - CLI messages are in French. The orchestrator's reason follows the language of your prompt.
 - Only LangChain is officially supported, and the tracker only works with LangChain.
 
 ## Security
 
-To report a security vulnerability, do not open a public issue: use [GitHub's private reporting](https://github.com/SethLawson07/autoroute/security/advisories/new). See [SECURITY.md](SECURITY.md).
+To report a security vulnerability, do not open a public issue: use [GitHub's private reporting](https://github.com/SethLawson07/autoroute/security/advisories/new). See [SECURITY.md](https://github.com/SethLawson07/autoroute/blob/main/SECURITY.md).
 
 ## License
 
-[MIT](LICENSE) © 2026 Laté Seth Lawson-Hetchely · [sethlawson.fr](https://sethlawson.fr/)
+[MIT](https://github.com/SethLawson07/autoroute/blob/main/LICENSE) © 2026 Laté Seth Lawson-Hetchely · [sethlawson.fr](https://sethlawson.fr/)

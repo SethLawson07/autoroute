@@ -5,7 +5,7 @@ import warnings
 import httpx
 
 from autoroute.config import (
-    ENV_KEYS, LIGHT_FAMILIES, MODES, Config, ModelConfig, get_api_key, load_orchestrator,
+    ENV_KEYS, LIGHT_FAMILIES, MODES, Config, ModelConfig, get_api_key, get_mode, load_orchestrator,
 )
 
 SUPPORTED = MODES["all"]
@@ -185,7 +185,9 @@ def pick_spread(models: list[ModelConfig], providers, limit: int) -> list[str]:
     return picked
 
 
-def discover_config(path: str | None = None, mode: str = "all") -> Config:
+def discover_config(path: str | None = None, mode: str | None = None) -> Config:
+    """Modèles découverts et orchestrateurs. Sans `mode`, respecte AUTOROUTE_MODE (souveraineté)."""
+    mode = mode or get_mode()
     wanted = load_orchestrator(path, mode)
     models: list[ModelConfig] = []
     errors: list[str] = []
