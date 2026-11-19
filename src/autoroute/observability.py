@@ -6,7 +6,7 @@ from pathlib import Path
 from autoroute.config import AUTOROUTE_DIR, ensure_parent, load_env
 
 LOG_PATH = AUTOROUTE_DIR / "log.jsonl"
-SCHEMA_VERSION = "2"
+SCHEMA_VERSION = "3"
 
 
 def _log_path() -> Path:

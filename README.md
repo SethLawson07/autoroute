@@ -11,7 +11,8 @@ from langchain.chat_models import init_chat_model
 from autoroute import route
 
 prompt = "Écris une fonction Python qui parse un CSV"
-model = init_chat_model(route(prompt))  # ex. "anthropic:claude-sonnet-…"
+r = route(prompt)
+model = init_chat_model(r.model)  # ex. "anthropic:claude-sonnet-…"
 ```
 
 - **OpenAI, Anthropic, Gemini, Mistral** : les modèles sont découverts avec tes clés, sans liste à maintenir.
@@ -21,7 +22,7 @@ model = init_chat_model(route(prompt))  # ex. "anthropic:claude-sonnet-…"
 - **Chaque choix est expliqué** : la décision et sa raison sont écrites dans un log JSONL.
 - **Ne plante jamais ton application** : orchestrateurs de secours, puis repli sur un modèle découvert.
 
-Autoroute n'appelle **pas** le modèle : il te renvoie une chaîne `fournisseur:nom`, que tu passes à LangChain ou à un autre outil.
+Autoroute n'appelle **pas** le modèle : il te renvoie un objet dont `r.model` est une chaîne `fournisseur:nom`, que tu passes à LangChain ou à un autre outil.
 
 ## Comment ça marche
 
@@ -58,16 +59,18 @@ Exemple de sortie :
 
 ```
 Modèle : anthropic:claude-opus-5-5
-Raison : Conception d'architecture complexe avec enjeux de sécurité : un modèle puissant est nécessaire.
 Replis : openai:gpt-5, google_genai:gemini-3.1-pro-preview
+Raison : Conception d'architecture complexe avec enjeux de sécurité : un modèle puissant est nécessaire.
+Routé  : oui
+Id     : ae3a775c9f1e4b0d8c2a6e1f3b5d7a90
 ```
 
 Dans ton code :
 
 ```python
-from autoroute import route_with_reason
+from autoroute import route
 
-r = route_with_reason("Écris une fonction Python qui parse un CSV")
+r = route("Écris une fonction Python qui parse un CSV")
 print(r.model, r.reason)
 ```
 
@@ -114,7 +117,7 @@ L'orchestrateur est le modèle qui fait le routage. Tu n'as pas à le choisir, e
 
 `autoroute models` affiche l'orchestrateur retenu et ceux de secours.
 
-**Le routage ne fait pas planter ton application.** Si aucun orchestrateur ne répond (panne, quota), Autoroute renvoie quand même un modèle découvert (autre que les orchestrateurs en échec, quand c'est possible), avec `routing_failed=True`, et note l'erreur dans le log. Il ne lève une exception que s'il n'a aucun modèle à proposer (aucune clé valide). Chaque échec d'orchestrateur, même rattrapé par un orchestrateur de secours, est signalé par un avertissement Python (`UserWarning`).
+**Le routage ne fait pas planter ton application.** Si aucun orchestrateur ne répond (panne, quota), Autoroute renvoie quand même un modèle découvert (autre que les orchestrateurs en échec, quand c'est possible), avec `r.routed == False`, et note l'erreur dans le log. Il ne lève une exception que s'il n'a aucun modèle à proposer (aucune clé valide). Un orchestrateur qui cite un modèle inexistant compte comme un échec : l'orchestrateur suivant prend le relais. Chaque échec d'orchestrateur, même rattrapé par un orchestrateur de secours, est signalé par un message `WARNING` du logger standard `autoroute` (module `logging`) : affiché par défaut sur la sortie d'erreur, il rejoint la supervision de ton application si tu configures `logging`.
 
 ### `.autoroute/config.yaml` (facultatif) : choisir ton orchestrateur
 
@@ -157,38 +160,29 @@ Elles peuvent aussi être écrites dans `.env`.
 ## Utilisation avec LangChain
 
 ```python
-from autoroute import route, route_candidates, route_with_reason
+from autoroute import route
 
-prompt = "Écris une fonction Python qui parse un CSV"
-
-# Choisis UNE des trois fonctions (chaque appel interroge l'orchestrateur) :
-route(prompt)             # le nom du modèle : "anthropic:claude-sonnet-5-5"
-route_candidates(prompt)  # le modèle, puis ses replis : ["anthropic:claude-sonnet-5-5", "openai:gpt-5.5", ...]
-route_with_reason(prompt) # tout le détail, ci-dessous
-
-r = route_with_reason(prompt)
-r.model           # le modèle choisi
-r.candidates      # le modèle choisi, puis jusqu'à 2 replis
-r.reason          # pourquoi ce modèle
-r.invalid_choice  # True si l'orchestrateur a cité un modèle inexistant : Autoroute utilise alors l'orchestrateur lui-même
-r.routing_failed  # True si aucun orchestrateur n'a répondu : le modèle renvoyé n'a pas été choisi pour ta tâche
-r.decision_id     # identifiant de ce routage, pour le retrouver dans le log
+r = route("Écris une fonction Python qui parse un CSV")
+r.model      # "anthropic:claude-sonnet-5-5"
+r.fallbacks  # ["openai:gpt-5.5", "google_genai:gemini-3.8-pro"]  (0 à 2, sans r.model)
+r.reason     # pourquoi ce modèle, dans la langue de la tâche
+r.routed     # True : choisi pour ta tâche. False : modèle par défaut (aucun orchestrateur n'a répondu)
+r.id         # identifiant de la décision dans le log
 ```
 
 ### Modèle de chat, avec replis
 
 Pour une question et une réponse : le modèle reçoit ton prompt et répond en une fois.
-Si le modèle choisi échoue (rate limit, panne, pas d'accès…), LangChain passe au candidat suivant.
+Si le modèle choisi échoue (rate limit, panne, pas d'accès…), LangChain passe au repli suivant.
 
 ```python
 from langchain.chat_models import init_chat_model
-from autoroute import route_with_reason
+from autoroute import route
 
 prompt = "Écris une fonction Python qui parse un CSV"
-r = route_with_reason(prompt)
-primary, *backups = r.candidates
+r = route(prompt)
 
-model = init_chat_model(primary).with_fallbacks([init_chat_model(m) for m in backups])
+model = init_chat_model(r.model).with_fallbacks([init_chat_model(m) for m in r.fallbacks])
 print(model.invoke(prompt).content)
 ```
 
@@ -199,16 +193,15 @@ Pour une tâche en plusieurs étapes : l'agent utilise des outils (fichiers, web
 ```python
 from langchain.agents import create_agent
 from langchain.agents.middleware import ModelFallbackMiddleware
-from autoroute import route_with_reason
+from autoroute import route
 
 prompt = "Analyse ce fichier de logs et résume les erreurs"
-r = route_with_reason(prompt)
-primary, *backups = r.candidates
+r = route(prompt)
 
 agent = create_agent(
-    model=primary,
+    model=r.model,
     tools=[...],
-    middleware=[ModelFallbackMiddleware(*backups)] if backups else [],
+    middleware=[ModelFallbackMiddleware(*r.fallbacks)] if r.fallbacks else [],
 )
 agent.invoke({"messages": [{"role": "user", "content": prompt}]})
 ```
@@ -231,7 +224,7 @@ Voir [`examples/`](examples) :
 Hors de LangChain, Autoroute te fournit déjà le fournisseur et le modèle à utiliser. La suite n'est pas encore prise en charge : choisir le bon SDK, appeler le modèle, gérer les replis. Pour un SDK qui n'attend que le nom du modèle (OpenAI, Anthropic…) :
 
 ```python
-provider, name = route(prompt).split(":", 1)
+provider, name = route(prompt).model.split(":", 1)
 ```
 
 ## Observabilité
@@ -245,21 +238,22 @@ Sous Windows PowerShell 5.1, lis-le avec `Get-Content .autoroute/log.jsonl -Enco
 ### `decision` (choix) : écrite à chaque routage
 
 ```json
-{"schema_version": "2", "timestamp": "2026-11-07T12:48:25+00:00", "event": "decision", "decision_id": "ae3a775c…", "task": "Écris une fonction Python qui parse un CSV", "orchestrator": "anthropic:claude-haiku-5-5", "model": "openai:gpt-5-mini", "candidates": ["openai:gpt-5-mini", "google_genai:gemini-3.8-flash", "anthropic:claude-haiku-5-5"], "reason": "...", "invalid_choice": false, "routing_failed": false, "latency_ms": 2965, "mode": "all", "error": null}
+{"schema_version": "3", "timestamp": "2026-11-07T12:48:25+00:00", "event": "decision", "decision_id": "ae3a775c…", "task": "Écris une fonction Python qui parse un CSV", "orchestrator": "anthropic:claude-haiku-5-5", "model": "openai:gpt-5-mini", "candidates": ["openai:gpt-5-mini", "google_genai:gemini-3.8-flash", "anthropic:claude-haiku-5-5"], "reason": "...", "invalid_choice": false, "routing_failed": false, "latency_ms": 2965, "mode": "all", "error": null}
 ```
 
 | Champ | Signification |
 |---|---|
+| `decision_id` | Identifiant de la décision (`r.id`) |
 | `task` | Ton prompt |
 | `orchestrator` | Le modèle qui a fait le choix |
 | `model` | Modèle choisi |
 | `candidates` | Le modèle choisi, puis jusqu'à 2 replis, dans l'ordre |
 | `reason` | Pourquoi l'orchestrateur l'a choisi |
-| `invalid_choice` | `true` si l'orchestrateur a cité un modèle inexistant : Autoroute utilise alors l'orchestrateur lui-même |
-| `routing_failed` | `true` si aucun orchestrateur n'a répondu : le modèle renvoyé n'a pas été choisi pour ta tâche |
+| `invalid_choice` | `true` si un orchestrateur a cité un modèle inexistant : l'orchestrateur suivant a pris le relais |
+| `routing_failed` | `true` si aucun orchestrateur n'a répondu (`r.routed == False`) : le modèle renvoyé n'a pas été choisi pour ta tâche |
 | `latency_ms` | Durée du routage |
 | `mode` | Mode utilisé |
-| `error` | Erreurs des orchestrateurs qui n'ont pas répondu (y compris si un orchestrateur de secours a pris le relais) |
+| `error` | Erreurs des orchestrateurs qui n'ont pas répondu ou ont cité un modèle inexistant (y compris si un orchestrateur de secours a pris le relais) |
 
 > **Le log contient tes prompts.** Il est ignoré par git. Ne le partage pas si tes prompts sont sensibles.
 

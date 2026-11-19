@@ -11,7 +11,8 @@ from langchain.chat_models import init_chat_model
 from autoroute import route
 
 prompt = "Write a Python function that parses a CSV file"
-model = init_chat_model(route(prompt))  # e.g. "anthropic:claude-sonnet-…"
+r = route(prompt)
+model = init_chat_model(r.model)  # e.g. "anthropic:claude-sonnet-…"
 ```
 
 - **OpenAI, Anthropic, Gemini, Mistral**: models are discovered with your keys, no list to maintain.
@@ -21,7 +22,7 @@ model = init_chat_model(route(prompt))  # e.g. "anthropic:claude-sonnet-…"
 - **Every choice is explained**: the decision and its reason are written to a JSONL log.
 - **Never crashes your application**: backup orchestrators, then fallback to a discovered model.
 
-Autoroute does **not** call the model: it returns a `provider:name` string that you pass to LangChain or to another tool.
+Autoroute does **not** call the model: it returns an object whose `r.model` is a `provider:name` string that you pass to LangChain or to another tool.
 
 ## How it works
 
@@ -58,16 +59,18 @@ Sample output (CLI labels in French for now, see [Known limitations](#known-limi
 
 ```
 Modèle : anthropic:claude-opus-5-5
-Raison : Complex architecture design with security requirements: a powerful model is needed.
 Replis : openai:gpt-5, google_genai:gemini-3.1-pro-preview
+Raison : Complex architecture design with security requirements: a powerful model is needed.
+Routé  : oui
+Id     : ae3a775c9f1e4b0d8c2a6e1f3b5d7a90
 ```
 
 In your code:
 
 ```python
-from autoroute import route_with_reason
+from autoroute import route
 
-r = route_with_reason("Write a Python function that parses a CSV file")
+r = route("Write a Python function that parses a CSV file")
 print(r.model, r.reason)
 ```
 
@@ -114,7 +117,7 @@ The orchestrator is the model that does the routing. You don't pick it, and no m
 
 `autoroute models` shows the chosen orchestrator and the backups.
 
-**Routing never crashes your application.** If no orchestrator answers (outage, quota), Autoroute still returns a discovered model (other than the failed orchestrators, when possible), with `routing_failed=True`, and logs the error. It only raises when it has no model to offer (no valid key). Every orchestrator failure, even one caught by a backup orchestrator, is reported with a Python warning (`UserWarning`).
+**Routing never crashes your application.** If no orchestrator answers (outage, quota), Autoroute still returns a discovered model (other than the failed orchestrators, when possible), with `r.routed == False`, and logs the error. It only raises when it has no model to offer (no valid key). An orchestrator that names a model that doesn't exist counts as a failure: the next orchestrator takes over. Every orchestrator failure, even one caught by a backup orchestrator, is reported as a `WARNING` on the standard `autoroute` logger (`logging` module): printed to stderr by default, it reaches your application's monitoring if you configure `logging`.
 
 ### `.autoroute/config.yaml` (optional): choosing your orchestrator
 
@@ -157,38 +160,29 @@ They can also be set in `.env`.
 ## Usage with LangChain
 
 ```python
-from autoroute import route, route_candidates, route_with_reason
+from autoroute import route
 
-prompt = "Write a Python function that parses a CSV file"
-
-# Pick ONE of the three functions (each call queries the orchestrator):
-route(prompt)             # the model name: "anthropic:claude-sonnet-5-5"
-route_candidates(prompt)  # the model, then its fallbacks: ["anthropic:claude-sonnet-5-5", "openai:gpt-5.5", ...]
-route_with_reason(prompt) # the full details, below
-
-r = route_with_reason(prompt)
-r.model           # the chosen model
-r.candidates      # the chosen model, then up to 2 fallbacks
-r.reason          # why this model
-r.invalid_choice  # True if the orchestrator named a model that doesn't exist: Autoroute then uses the orchestrator itself
-r.routing_failed  # True if no orchestrator answered: the returned model was not chosen for your task
-r.decision_id     # ID of this routing, to find it in the log
+r = route("Write a Python function that parses a CSV file")
+r.model      # "anthropic:claude-sonnet-5-5"
+r.fallbacks  # ["openai:gpt-5.5", "google_genai:gemini-3.8-pro"]  (0 to 2, without r.model)
+r.reason     # why this model, in the language of the task
+r.routed     # True: chosen for your task. False: default model (no orchestrator answered)
+r.id         # ID of the decision in the log
 ```
 
 ### Chat model, with fallbacks
 
 For a question and an answer: the model receives your prompt and answers in one go.
-If the chosen model fails (rate limit, outage, no access…), LangChain moves on to the next candidate.
+If the chosen model fails (rate limit, outage, no access…), LangChain moves on to the next fallback.
 
 ```python
 from langchain.chat_models import init_chat_model
-from autoroute import route_with_reason
+from autoroute import route
 
 prompt = "Write a Python function that parses a CSV file"
-r = route_with_reason(prompt)
-primary, *backups = r.candidates
+r = route(prompt)
 
-model = init_chat_model(primary).with_fallbacks([init_chat_model(m) for m in backups])
+model = init_chat_model(r.model).with_fallbacks([init_chat_model(m) for m in r.fallbacks])
 print(model.invoke(prompt).content)
 ```
 
@@ -199,16 +193,15 @@ For a multi-step task: the agent uses tools (files, web, APIs…) until it can a
 ```python
 from langchain.agents import create_agent
 from langchain.agents.middleware import ModelFallbackMiddleware
-from autoroute import route_with_reason
+from autoroute import route
 
 prompt = "Analyze this log file and summarize the errors"
-r = route_with_reason(prompt)
-primary, *backups = r.candidates
+r = route(prompt)
 
 agent = create_agent(
-    model=primary,
+    model=r.model,
     tools=[...],
-    middleware=[ModelFallbackMiddleware(*backups)] if backups else [],
+    middleware=[ModelFallbackMiddleware(*r.fallbacks)] if r.fallbacks else [],
 )
 agent.invoke({"messages": [{"role": "user", "content": prompt}]})
 ```
@@ -231,7 +224,7 @@ See [`examples/`](https://github.com/SethLawson07/autoroute/tree/main/examples):
 Outside LangChain, Autoroute already gives you the provider and the model to use. What comes next is not supported yet: picking the right SDK, calling the model, handling fallbacks. For an SDK that only expects the model name (OpenAI, Anthropic…):
 
 ```python
-provider, name = route(prompt).split(":", 1)
+provider, name = route(prompt).model.split(":", 1)
 ```
 
 ## Observability
@@ -245,21 +238,22 @@ On Windows PowerShell 5.1, read it with `Get-Content .autoroute/log.jsonl -Encod
 ### `decision`: written on every routing call
 
 ```json
-{"schema_version": "2", "timestamp": "2026-11-07T12:48:25+00:00", "event": "decision", "decision_id": "ae3a775c…", "task": "Write a Python function that parses a CSV file", "orchestrator": "anthropic:claude-haiku-5-5", "model": "openai:gpt-5-mini", "candidates": ["openai:gpt-5-mini", "google_genai:gemini-3.8-flash", "anthropic:claude-haiku-5-5"], "reason": "...", "invalid_choice": false, "routing_failed": false, "latency_ms": 2965, "mode": "all", "error": null}
+{"schema_version": "3", "timestamp": "2026-11-07T12:48:25+00:00", "event": "decision", "decision_id": "ae3a775c…", "task": "Write a Python function that parses a CSV file", "orchestrator": "anthropic:claude-haiku-5-5", "model": "openai:gpt-5-mini", "candidates": ["openai:gpt-5-mini", "google_genai:gemini-3.8-flash", "anthropic:claude-haiku-5-5"], "reason": "...", "invalid_choice": false, "routing_failed": false, "latency_ms": 2965, "mode": "all", "error": null}
 ```
 
 | Field | Meaning |
 |---|---|
+| `decision_id` | ID of the decision (`r.id`) |
 | `task` | Your prompt |
 | `orchestrator` | The model that made the choice |
 | `model` | Chosen model |
 | `candidates` | The chosen model, then up to 2 fallbacks, in order |
 | `reason` | Why the orchestrator chose it |
-| `invalid_choice` | `true` if the orchestrator named a model that doesn't exist: Autoroute then uses the orchestrator itself |
-| `routing_failed` | `true` if no orchestrator answered: the returned model was not chosen for your task |
+| `invalid_choice` | `true` if an orchestrator named a model that doesn't exist: the next orchestrator took over |
+| `routing_failed` | `true` if no orchestrator answered (`r.routed == False`): the returned model was not chosen for your task |
 | `latency_ms` | Routing time |
 | `mode` | Mode used |
-| `error` | Errors from orchestrators that didn't answer (including when a backup orchestrator took over) |
+| `error` | Errors from orchestrators that didn't answer or named a model that doesn't exist (including when a backup orchestrator took over) |
 
 > **The log contains your prompts.** It is ignored by git. Do not share it if your prompts are sensitive.
 

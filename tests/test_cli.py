@@ -126,3 +126,18 @@ def test_route_shows_orchestrator_failure_once(monkeypatch):
     assert result.exit_code == 0
     assert result.output.count("Attention : Aucun orchestrateur n'a répondu") == 1
     assert "Modèle : " in result.output
+
+
+def test_route_shows_route_fields(monkeypatch, fake_llm):
+    from autoroute.router import Decision
+
+    monkeypatch.setattr(catalog, "list_chat_models", lambda p: [f"{p}-mini", f"{p}-large"])
+    fake_llm(Decision(choices=["openai:openai-large", "anthropic:anthropic-mini"], reason="Code"))
+    result = runner.invoke(app, ["route", "Écris du code"])
+    assert_clean(result)
+    assert result.exit_code == 0
+    assert "Modèle : openai:openai-large" in result.output
+    assert "Replis : anthropic:anthropic-mini" in result.output
+    assert "Raison : Code" in result.output
+    assert "Routé  : oui" in result.output
+    assert "Attention" not in result.output

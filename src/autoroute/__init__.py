@@ -1,3 +1,3 @@
-from autoroute.router import route, route_candidates, route_with_reason
+from autoroute.router import Route, route
 
-__all__ = ["route", "route_candidates", "route_with_reason"]
+__all__ = ["Route", "route"]

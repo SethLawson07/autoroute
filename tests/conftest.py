@@ -52,3 +52,17 @@ def fake_llm(monkeypatch):
         return fake
 
     return install
+
+@pytest.fixture
+def fake_orchestrators(monkeypatch):
+    """Une réponse par orchestrateur : une Decision, ou une exception à lever."""
+    def install(answers):
+        def init(spec, **kw):
+            answer = answers[spec]
+            if isinstance(answer, Exception):
+                raise answer
+            return FakeLLM(answer)
+
+        monkeypatch.setattr("autoroute.router.init_chat_model", init)
+
+    return install

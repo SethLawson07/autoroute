@@ -1,10 +1,12 @@
+import logging
 import os
-import warnings
 from pathlib import Path
 
 import yaml
 from dotenv import dotenv_values, load_dotenv
 from pydantic import BaseModel
+
+logger = logging.getLogger(__name__)
 
 # Dossier d'Autoroute dans le projet de l'utilisateur (le point évite un conflit de nom
 # avec le paquet « autoroute » lors d'un import).
@@ -83,7 +85,7 @@ def load_orchestrator(path: str | None = None, mode: str = "all") -> str | None:
         return None
 
     def unreadable(why: str) -> None:
-        warnings.warn(f"{p.as_posix()} illisible ({why}) : choix automatique de l'orchestrateur.")
+        logger.warning(f"{p.as_posix()} illisible ({why}) : choix automatique de l'orchestrateur.")
 
     try:
         data = yaml.safe_load(p.read_text(encoding="utf-8")) or {}

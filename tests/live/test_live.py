@@ -6,7 +6,7 @@ import json
 
 import pytest
 
-from autoroute import observability, route_with_reason
+from autoroute import observability, route
 from autoroute.catalog import discover_config, list_chat_models
 from autoroute.config import ENV_KEYS, MODES, get_api_key
 
@@ -44,24 +44,24 @@ def test_routing_in_single_provider_mode(provider):
     need_key(provider)
     mode = PROVIDER_MODE[provider]
     config = discover_config(mode=mode)
-    result = route_with_reason("Dis bonjour en une phrase.", config)
+    r = route("Dis bonjour en une phrase.", config)
     event = last_decision()
     print(
-        f"\n{mode} : orchestrateur {event['orchestrator']} -> {result.model} "
-        f"({event['latency_ms']} ms, invalid_choice={result.invalid_choice})"
+        f"\n{mode} : orchestrateur {event['orchestrator']} -> {r.model} "
+        f"({event['latency_ms']} ms, invalid_choice={event['invalid_choice']})"
     )
-    assert not result.routing_failed, event["error"]
+    assert r.routed, event["error"]
     # Le mode est respecté : aucun modèle d'un autre fournisseur (souveraineté).
-    assert all(c.startswith(f"{provider}:") for c in result.candidates)
+    assert all(c.startswith(f"{provider}:") for c in [r.model, *r.fallbacks])
 
 
 def test_routing_in_all_mode_is_logged():
     if not any(get_api_key(p) for p in MODES["all"]):
         pytest.skip("aucune clé API")
-    result = route_with_reason("Écris une fonction Python qui trie une liste de dictionnaires.")
+    r = route("Écris une fonction Python qui trie une liste de dictionnaires.")
     event = last_decision()
-    print(f"\nall : {event['orchestrator']} -> {result.candidates} ({event['latency_ms']} ms)")
-    assert not result.routing_failed, event["error"]
-    assert event["decision_id"] == result.decision_id
+    print(f"\nall : {event['orchestrator']} -> {[r.model, *r.fallbacks]} ({event['latency_ms']} ms)")
+    assert r.routed, event["error"]
+    assert event["decision_id"] == r.id
     assert event["mode"] == "all"
     assert event["latency_ms"] < 60_000

@@ -1,12 +1,14 @@
 import json
+import logging
 import re
-import warnings
 
 import httpx
 
 from autoroute.config import (
     ENV_KEYS, LIGHT_FAMILIES, MODES, Config, ModelConfig, get_api_key, get_mode, load_orchestrator,
 )
+
+logger = logging.getLogger(__name__)
 
 SUPPORTED = MODES["all"]
 
@@ -204,7 +206,7 @@ def discover_config(path: str | None = None, mode: str | None = None) -> Config:
             errors.append(f"{provider} : {e}")
 
     if errors and models:
-        warnings.warn("Fournisseurs ignorés : " + " ; ".join(errors))
+        logger.warning("Fournisseurs ignorés : " + " ; ".join(errors))
     if not models:
         keys = " ou ".join(ENV_KEYS[p] for p in MODES[mode])
         detail = f" Erreurs : {' ; '.join(errors)}" if errors else ""
@@ -216,5 +218,5 @@ def discover_config(path: str | None = None, mode: str | None = None) -> Config:
             picked = [forced] + [o for o in picked if o != forced][: MAX_ORCHESTRATORS - 1]
         except ValueError as e:
             # Ne pas casser l'application : on prévient et on garde le choix automatique.
-            warnings.warn(f"{e} Choix automatique utilisé : {picked[0]}.")
+            logger.warning(f"{e} Choix automatique utilisé : {picked[0]}.")
     return Config(orchestrator=picked[0], backup_orchestrators=picked[1:], models=models)

@@ -1,5 +1,5 @@
+import logging
 import re
-import warnings
 from contextlib import contextmanager
 from importlib.resources import files
 from pathlib import Path
@@ -9,7 +9,7 @@ import typer
 
 from autoroute.catalog import discover_config
 from autoroute.config import ENV_KEYS, MODES, config_path, ensure_parent, get_mode, key_source
-from autoroute.router import route_with_reason
+from autoroute.router import route
 
 app = typer.Typer(help="Autoroute : choisit le bon modèle LLM pour une tâche.")
 
@@ -26,22 +26,29 @@ def _fail(e: Exception) -> NoReturn:
     raise typer.Exit(1)
 
 
-def _show_warning(message, category, filename, lineno, file=None, line=None) -> None:
-    typer.echo(f"Attention : {message}", err=True)
+class _Attention(logging.Handler):
+    """Affiche les avertissements d'Autoroute en une ligne, sans nom de logger."""
+
+    def emit(self, record: logging.LogRecord) -> None:
+        typer.echo(f"Attention : {record.getMessage()}", err=True)
 
 
 @contextmanager
 def _cli() -> Iterator[None]:
     """Cadre commun des commandes : jamais de trace Python, avertissements en une ligne."""
-    with warnings.catch_warnings():
-        warnings.simplefilter("always")
-        warnings.showwarning = _show_warning
-        try:
-            yield
-        except (typer.Exit, typer.Abort):
-            raise
-        except Exception as e:
-            _fail(e)
+    logger = logging.getLogger("autoroute")
+    handler = _Attention(logging.WARNING)
+    logger.addHandler(handler)
+    propagate, logger.propagate = logger.propagate, False  # pas de second affichage
+    try:
+        yield
+    except (typer.Exit, typer.Abort):
+        raise
+    except Exception as e:
+        _fail(e)
+    finally:
+        logger.removeHandler(handler)
+        logger.propagate = propagate
 
 
 def _template(name: str) -> str:
@@ -108,11 +115,12 @@ def models():
 def route_cmd(task: str):
     """Affiche le modèle choisi pour une tâche, et pourquoi."""
     with _cli():
-        result = route_with_reason(task)  # les échecs d'orchestrateur sont affichés en avertissement
-        typer.echo(f"Modèle : {result.model}")
-        typer.echo(f"Raison : {result.reason}")
-        if len(result.candidates) > 1:
-            typer.echo(f"Replis : {', '.join(result.candidates[1:])}")
+        r = route(task)  # les échecs d'orchestrateur sont affichés en avertissement
+        typer.echo(f"Modèle : {r.model}")
+        typer.echo(f"Replis : {', '.join(r.fallbacks) or 'aucun'}")
+        typer.echo(f"Raison : {r.reason}")
+        typer.echo(f"Routé  : {'oui' if r.routed else 'non (modèle par défaut)'}")
+        typer.echo(f"Id     : {r.id}")
 
 
 if __name__ == "__main__":

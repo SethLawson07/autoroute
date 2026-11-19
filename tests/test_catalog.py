@@ -155,11 +155,11 @@ def test_user_orchestrator_overrides_automatic(monkeypatch):
     assert config.backup_orchestrators == ["openai:gpt-4o-mini"]
 
 
-def test_unreachable_user_orchestrator_warns_and_uses_automatic(monkeypatch):
+def test_unreachable_user_orchestrator_warns_and_uses_automatic(monkeypatch, caplog):
     write_config("orchestrators:\n  all: openai:modele-retire\n")
     fake_models(monkeypatch, {"openai": ["gpt-5-mini"]})
-    with pytest.warns(UserWarning, match="modele-retire"):
-        config = catalog.discover_config()
+    config = catalog.discover_config()
+    assert "modele-retire" in caplog.text
     assert config.orchestrator == "openai:gpt-5-mini"
 
 
@@ -172,13 +172,13 @@ def test_unexpected_api_response_is_a_clean_error(monkeypatch):
         catalog.list_chat_models("openai")
 
 
-def test_unexpected_api_response_skips_only_that_provider(monkeypatch):
+def test_unexpected_api_response_skips_only_that_provider(monkeypatch, caplog):
     def list_models(provider):
         if provider == "openai":
             raise KeyError("data")
         return ["claude-haiku-5-5"]
 
     monkeypatch.setattr(catalog, "list_models", list_models)
-    with pytest.warns(UserWarning, match="openai : réponse inattendue"):
-        config = catalog.discover_config()
+    config = catalog.discover_config()
+    assert "openai : réponse inattendue" in caplog.text
     assert [m.spec for m in config.models] == ["anthropic:claude-haiku-5-5"]

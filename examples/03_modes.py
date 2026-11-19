@@ -1,4 +1,4 @@
-from autoroute.router import route_with_reason
+from autoroute import route
 
 TASKS = [
     "Dis bonjour en trois langues",
@@ -7,5 +7,5 @@ TASKS = [
 ]
 
 for task in TASKS:
-    r = route_with_reason(task)
-    print(f"{r.model}  (invalid_choice={r.invalid_choice})\n  {r.reason}\n")
+    r = route(task)
+    print(f"{r.model}  (routed={r.routed})\n  {r.reason}\n")

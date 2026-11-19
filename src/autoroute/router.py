@@ -1,9 +1,9 @@
+import logging
 import time
-import warnings
 from uuid import uuid4
 
 from langchain.chat_models import init_chat_model
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from autoroute.catalog import discover_config, pick_spread
 from autoroute.config import Config, ModelConfig, get_mode
@@ -12,19 +12,28 @@ from autoroute.observability import log_decision
 
 MAX_CANDIDATES = 3  # le choix principal + 2 replis au plus
 
+# Pas de NullHandler : sans configuration, Python affiche quand même les WARNING sur stderr.
+logger = logging.getLogger(__name__)
+
 
 class Decision(BaseModel):
     choices: list[str]  # modèles au format provider:nom, le meilleur en premier
     reason: str         # pourquoi le premier choix, en une ou deux phrases
 
 
-class RouteResult(BaseModel):
-    model: str             # "provider:name", utilisable par init_chat_model
-    reason: str
-    candidates: list[str]  # model en premier, puis les replis en cas d'échec
-    invalid_choice: bool = False  # l'orchestrateur n'a donné aucun nom valide : repli sur lui
-    routing_failed: bool = False  # aucun orchestrateur n'a répondu : repli sur un modèle découvert
-    decision_id: str = Field(default_factory=lambda: uuid4().hex)
+class Route(BaseModel):
+    """Résultat de route() : le modèle à utiliser, ses replis, et pourquoi."""
+
+    model_config = ConfigDict(frozen=True)
+
+    model: str                                           # "provider:name", pour init_chat_model
+    fallbacks: list[str] = Field(default_factory=list)   # 0 à 2 replis, dans l'ordre, sans model
+    reason: str                                          # pourquoi ce modèle
+    routed: bool = True  # False : aucun orchestrateur n'a répondu, model n'a pas été choisi pour la tâche
+    id: str = Field(default_factory=lambda: uuid4().hex)  # decision_id dans le log
+
+    def __str__(self) -> str:
+        return repr(self)  # print(r) affiche Route(model=..., ...), plus lisible pour déboguer
 
 
 def _find(config: Config, value: str) -> ModelConfig | None:
@@ -119,10 +128,11 @@ def _error_text(e: Exception) -> str:
     return f"{type(e).__name__}: {msg[:300]}"
 
 
-def route_with_reason(task: str, config: Config | None = None) -> RouteResult:
+def route(task: str, config: Config | None = None) -> Route:
     """Choisit le modèle. Ne lève une exception que si aucun modèle n'est disponible
-    (pas de clé, découverte impossible). Une panne d'orchestrateur ne casse pas l'appel :
-    les orchestrateurs de secours sont essayés, puis Autoroute se replie sur un modèle découvert.
+    (pas de clé, découverte impossible). Un orchestrateur en panne, ou qui cite un modèle
+    inexistant, ne casse pas l'appel : les orchestrateurs de secours sont essayés, puis
+    Autoroute se replie sur un modèle découvert (routed=False).
     """
     start = time.perf_counter()
     decision_id = uuid4().hex
@@ -147,74 +157,62 @@ def route_with_reason(task: str, config: Config | None = None) -> RouteResult:
             )
             raise
 
-    decision: Decision | None = None
+    answered: str | None = None   # l'orchestrateur dont le choix a été retenu
+    candidates: list[str] = []
+    reason = ""
+    invalid_choice = False
     failures: list[str] = []
     failed: list[str] = []
     for orchestrator in config.orchestrators:
         try:
             decision = _ask(orchestrator, task, config)
-            break
         except Exception as e:
             failed.append(orchestrator)
             failures.append(f"{orchestrator} : {_error_text(e)}")
+            continue
+        candidates = _candidates(config, decision.choices)
+        if candidates:
+            answered, reason = orchestrator, decision.reason
+            break
+        # Choix invalide : traité comme un échec, l'orchestrateur suivant a sa chance.
+        invalid_choice = True
+        failed.append(orchestrator)
+        failures.append(f"{orchestrator} : choix invalide {decision.choices!r}")
 
-    if decision is None:
+    if answered is None:
         # Dernier recours : l'application continue avec un modèle découvert.
         candidates = _last_resort(config)
-        result = RouteResult(
-            model=candidates[0],
-            reason="Aucun orchestrateur n'a répondu : repli sur un modèle découvert.",
-            candidates=candidates,
-            routing_failed=True,
-            decision_id=decision_id,
-        )
-    else:
-        candidates = _candidates(config, decision.choices)
-        if not candidates:
-            result = RouteResult(
-                model=orchestrator,
-                reason=f"Choix invalide de l'orchestrateur ({decision.choices!r}), repli sur l'orchestrateur.",
-                invalid_choice=True,
-                candidates=[orchestrator],
-                decision_id=decision_id,
-            )
-        else:
-            result = RouteResult(
-                model=candidates[0], reason=decision.reason, candidates=candidates,
-                decision_id=decision_id,
-            )
+        reason = "Aucun orchestrateur n'a répondu : repli sur un modèle découvert."
+
+    result = Route(
+        model=candidates[0],
+        fallbacks=candidates[1:],
+        reason=reason,
+        routed=answered is not None,
+        id=decision_id,
+    )
 
     log_decision(
         decision_id=decision_id,
         task=task,
-        orchestrator=orchestrator if decision else "",
+        orchestrator=answered or "",
         model=result.model,
-        candidates=result.candidates,
+        candidates=candidates,
         reason=result.reason,
-        invalid_choice=result.invalid_choice,
-        routing_failed=result.routing_failed,
+        invalid_choice=invalid_choice,
+        routing_failed=not result.routed,
         latency_ms=elapsed(),
         mode=mode,
         error=" ; ".join(failures) or None,
     )
-    # Après le log : la décision est écrite même si les avertissements sont traités en erreurs.
-    if result.routing_failed:
-        warnings.warn(
+    if not result.routed:
+        logger.warning(
             f"Aucun orchestrateur n'a répondu ({', '.join(failed)}) : "
             f"repli sur {result.model}. Détail de l'erreur dans le log."
         )
     elif failed:
-        warnings.warn(
-            f"Orchestrateur en échec : {', '.join(failed)}. Secours utilisé : {orchestrator}. "
+        logger.warning(
+            f"Orchestrateur en échec : {', '.join(failed)}. Secours utilisé : {answered}. "
             "Détail de l'erreur dans le log."
         )
     return result
-
-
-def route(task: str, config: Config | None = None) -> str:
-    return route_with_reason(task, config).model
-
-
-def route_candidates(task: str, config: Config | None = None) -> list[str]:
-    """Le meilleur modèle puis ses replis éventuels (MAX_CANDIDATES - 1 au plus), pour with_fallbacks ou ModelFallbackMiddleware."""
-    return route_with_reason(task, config).candidates
