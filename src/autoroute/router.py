@@ -21,13 +21,40 @@ class Decision(BaseModel):
     reason: str         # pourquoi le premier choix, en une ou deux phrases
 
 
+# Nom neutre de chaque fournisseur (identifiant LangChain → nom courant).
+PROVIDERS = {
+    "openai": "openai",
+    "anthropic": "anthropic",
+    "google_genai": "google",
+    "mistralai": "mistral",
+}
+
+# Formats de sortie (paramètre `to` de route()) : spec LangChain "provider:name" → chaîne.
+FORMATS = {
+    "langchain": lambda provider, name: f"{provider}:{name}",  # LangChain, LangGraph, Deep Agents
+    "native": lambda provider, name: name,  # SDK officiels, LlamaIndex, Haystack
+}
+
+
+def _format(spec: str, to: str) -> str:
+    provider, name = spec.split(":", 1)
+    return FORMATS[to](provider, name)
+
+
+def _provider(spec: str) -> str:
+    provider = spec.split(":", 1)[0]
+    return PROVIDERS.get(provider, provider)
+
+
 class Route(BaseModel):
     """Résultat de route() : le modèle à utiliser, ses replis, et pourquoi."""
 
     model_config = ConfigDict(frozen=True)
 
-    model: str                                           # "provider:name", pour init_chat_model
-    fallbacks: list[str] = Field(default_factory=list)   # 0 à 2 replis, dans l'ordre, sans model
+    model: str                                           # meilleur modèle, au format demandé (to=)
+    fallbacks: list[str] = Field(default_factory=list)   # 0 à 2 replis, même format, sans model
+    provider: str = ""                                   # fournisseur de model : openai, anthropic, google, mistral
+    providers: list[str] = Field(default_factory=list)   # fournisseurs de [model, *fallbacks], même ordre
     reason: str                                          # pourquoi ce modèle
     routed: bool = True  # False : aucun orchestrateur n'a répondu, model n'a pas été choisi pour la tâche
     id: str = Field(default_factory=lambda: uuid4().hex)  # decision_id dans le log
@@ -128,12 +155,18 @@ def _error_text(e: Exception) -> str:
     return f"{type(e).__name__}: {msg[:300]}"
 
 
-def route(task: str, config: Config | None = None) -> Route:
+def route(task: str, config: Config | None = None, to: str = "langchain") -> Route:
     """Choisit le modèle. Ne lève une exception que si aucun modèle n'est disponible
-    (pas de clé, découverte impossible). Un orchestrateur en panne, ou qui cite un modèle
-    inexistant, ne casse pas l'appel : les orchestrateurs de secours sont essayés, puis
-    Autoroute se replie sur un modèle découvert (routed=False).
+    (pas de clé, découverte impossible) ou si `to` est inconnu. Un orchestrateur en panne,
+    ou qui cite un modèle inexistant, ne casse pas l'appel : les orchestrateurs de secours
+    sont essayés, puis Autoroute se replie sur un modèle découvert (routed=False).
+
+    `to` choisit le format de model et fallbacks : "langchain" (défaut, "google_genai:gemini-…")
+    ou "native" (nom officiel seul, "gemini-…", pour les SDK, LlamaIndex, Haystack).
     """
+    if to not in FORMATS:
+        # Erreur de code, pas une panne de routage : visible tout de suite, avant tout appel.
+        raise ValueError(f"to={to!r} inconnu. Valeurs acceptées : {', '.join(FORMATS)}.")
     start = time.perf_counter()
     decision_id = uuid4().hex
     mode = "custom" if config else "all"
@@ -184,9 +217,13 @@ def route(task: str, config: Config | None = None) -> Route:
         candidates = _last_resort(config)
         reason = "Aucun orchestrateur n'a répondu : repli sur un modèle découvert."
 
+    formatted = [_format(spec, to) for spec in candidates]
+    providers = [_provider(spec) for spec in candidates]
     result = Route(
-        model=candidates[0],
-        fallbacks=candidates[1:],
+        model=formatted[0],
+        fallbacks=formatted[1:],
+        provider=providers[0],
+        providers=providers,
         reason=reason,
         routed=answered is not None,
         id=decision_id,
@@ -196,7 +233,7 @@ def route(task: str, config: Config | None = None) -> Route:
         decision_id=decision_id,
         task=task,
         orchestrator=answered or "",
-        model=result.model,
+        model=candidates[0],  # le log garde le format "provider:name", quel que soit to
         candidates=candidates,
         reason=result.reason,
         invalid_choice=invalid_choice,
@@ -208,7 +245,7 @@ def route(task: str, config: Config | None = None) -> Route:
     if not result.routed:
         logger.warning(
             f"Aucun orchestrateur n'a répondu ({', '.join(failed)}) : "
-            f"repli sur {result.model}. Détail de l'erreur dans le log."
+            f"repli sur {candidates[0]}. Détail de l'erreur dans le log."
         )
     elif failed:
         logger.warning(

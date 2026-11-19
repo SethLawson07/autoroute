@@ -22,7 +22,7 @@ model = init_chat_model(r.model)  # e.g. "anthropic:claude-sonnet-…"
 - **Every choice is explained**: the decision and its reason are written to a JSONL log.
 - **Never crashes your application**: backup orchestrators, then fallback to a discovered model.
 
-Autoroute does **not** call the model: it returns an object whose `r.model` is a `provider:name` string that you pass to LangChain or to another tool.
+Autoroute does **not** call the model: it returns an object whose `r.model` is the model name, in LangChain format (default) or in the native format of the official SDKs, LlamaIndex and Haystack (`route(prompt, to="native")`).
 
 ## How it works
 
@@ -166,6 +166,8 @@ from autoroute import route
 r = route("Write a Python function that parses a CSV file")
 r.model      # "anthropic:claude-sonnet-5-5"
 r.fallbacks  # ["openai:gpt-5.5", "google_genai:gemini-3.8-pro"]  (0 to 2, without r.model)
+r.provider   # "anthropic": provider of r.model (openai, anthropic, google, mistral)
+r.providers  # ["anthropic", "openai", "google"]: providers of [r.model, *r.fallbacks], in order
 r.reason     # why this model, in the language of the task
 r.routed     # True: chosen for your task. False: default model (no orchestrator answered)
 r.id         # ID of the decision in the log
@@ -220,13 +222,36 @@ See [`examples/`](https://github.com/SethLawson07/autoroute/tree/main/examples):
 | `03_modes.py` | Routing of simple and complex tasks |
 | `04_fallback.py` | A real fallback, with a primary model forced to fail |
 
-### Other tools
+### Other frameworks: `to="native"`
 
-Outside LangChain, Autoroute already gives you the provider and the model to use. What comes next is not supported yet: picking the right SDK, calling the model, handling fallbacks. For an SDK that only expects the model name (OpenAI, Anthropic…):
+The `to` parameter picks the format of `r.model` and `r.fallbacks`:
+
+| `to=` | `r.model` | For |
+|---|---|---|
+| `"langchain"` (default) | `"google_genai:gemini-3.8-flash"` | LangChain, LangGraph, Deep Agents |
+| `"native"` | `"gemini-3.8-flash"` | Official SDKs (OpenAI, Anthropic, Google, Mistral), LlamaIndex, Haystack |
+
+With `"native"`, `r.model` is the official model name, and `r.provider` tells you which SDK or class to use (`r.providers` does the same for each fallback):
 
 ```python
-provider, name = route(prompt).model.split(":", 1)
+r = route(prompt, to="native")   # e.g. r.model = "claude-haiku-5-5", r.provider = "anthropic"
+
+# Official SDK
+import anthropic
+anthropic.Anthropic().messages.create(model=r.model, max_tokens=1024, messages=[{"role": "user", "content": prompt}])
+
+# LlamaIndex
+from llama_index.llms.anthropic import Anthropic
+llm = Anthropic(model=r.model)
+
+# Haystack
+from haystack_integrations.components.generators.anthropic import AnthropicChatGenerator
+generator = AnthropicChatGenerator(model=r.model)
 ```
+
+To handle every provider, map each one to its class, for example `{"anthropic": Anthropic, "openai": OpenAI, ...}[r.provider](model=r.model)`. The SDK, the class and the fallbacks are up to you: Autoroute never calls the model. An unknown `to` value raises a `ValueError`.
+
+More formats (LiteLLM, Pydantic AI) are planned.
 
 ## Observability
 
@@ -292,7 +317,7 @@ The server only listens on your machine (`127.0.0.1`), read-only, and the page l
 - No check of the chosen model's capabilities (tool calling, vision).
 - No cost calculation or savings measurement yet.
 - CLI messages are in French. The orchestrator's reason follows the language of your prompt.
-- Only LangChain is officially supported.
+- LangChain is the reference integration: the examples and automatic fallbacks are written for it. With `to="native"`, picking the SDK and handling fallbacks are up to you. LangChain is still installed with Autoroute, which uses it to query the orchestrator.
 
 ## Security
 

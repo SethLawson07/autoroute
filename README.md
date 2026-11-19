@@ -22,7 +22,7 @@ model = init_chat_model(r.model)  # ex. "anthropic:claude-sonnet-…"
 - **Chaque choix est expliqué** : la décision et sa raison sont écrites dans un log JSONL.
 - **Ne plante jamais ton application** : orchestrateurs de secours, puis repli sur un modèle découvert.
 
-Autoroute n'appelle **pas** le modèle : il te renvoie un objet dont `r.model` est une chaîne `fournisseur:nom`, que tu passes à LangChain ou à un autre outil.
+Autoroute n'appelle **pas** le modèle : il te renvoie un objet dont `r.model` est le nom du modèle, au format de LangChain (par défaut) ou au format natif des SDK officiels, de LlamaIndex et de Haystack (`route(prompt, to="native")`).
 
 ## Comment ça marche
 
@@ -166,6 +166,8 @@ from autoroute import route
 r = route("Écris une fonction Python qui parse un CSV")
 r.model      # "anthropic:claude-sonnet-5-5"
 r.fallbacks  # ["openai:gpt-5.5", "google_genai:gemini-3.8-pro"]  (0 à 2, sans r.model)
+r.provider   # "anthropic" : fournisseur de r.model (openai, anthropic, google, mistral)
+r.providers  # ["anthropic", "openai", "google"] : fournisseurs de [r.model, *r.fallbacks], dans l'ordre
 r.reason     # pourquoi ce modèle, dans la langue de la tâche
 r.routed     # True : choisi pour ta tâche. False : modèle par défaut (aucun orchestrateur n'a répondu)
 r.id         # identifiant de la décision dans le log
@@ -220,13 +222,36 @@ Voir [`examples/`](examples) :
 | `03_modes.py` | Routage de tâches simples et complexes |
 | `04_fallback.py` | Un vrai repli, avec un modèle principal forcé en échec |
 
-### Autres outils
+### Autres frameworks : `to="native"`
 
-Hors de LangChain, Autoroute te fournit déjà le fournisseur et le modèle à utiliser. La suite n'est pas encore prise en charge : choisir le bon SDK, appeler le modèle, gérer les replis. Pour un SDK qui n'attend que le nom du modèle (OpenAI, Anthropic…) :
+Le paramètre `to` choisit le format de `r.model` et `r.fallbacks` :
+
+| `to=` | `r.model` | Pour |
+|---|---|---|
+| `"langchain"` (défaut) | `"google_genai:gemini-3.8-flash"` | LangChain, LangGraph, Deep Agents |
+| `"native"` | `"gemini-3.8-flash"` | SDK officiels (OpenAI, Anthropic, Google, Mistral), LlamaIndex, Haystack |
+
+Avec `"native"`, `r.model` est le nom officiel du modèle, et `r.provider` dit quel SDK ou quelle classe utiliser (`r.providers` fait de même pour chaque repli) :
 
 ```python
-provider, name = route(prompt).model.split(":", 1)
+r = route(prompt, to="native")   # ex. r.model = "claude-haiku-5-5", r.provider = "anthropic"
+
+# SDK officiel
+import anthropic
+anthropic.Anthropic().messages.create(model=r.model, max_tokens=1024, messages=[{"role": "user", "content": prompt}])
+
+# LlamaIndex
+from llama_index.llms.anthropic import Anthropic
+llm = Anthropic(model=r.model)
+
+# Haystack
+from haystack_integrations.components.generators.anthropic import AnthropicChatGenerator
+generator = AnthropicChatGenerator(model=r.model)
 ```
+
+Pour gérer tous les fournisseurs, associe chacun à sa classe, par exemple `{"anthropic": Anthropic, "openai": OpenAI, ...}[r.provider](model=r.model)`. Le SDK, la classe et les replis restent à ta charge : Autoroute n'appelle jamais le modèle. Une valeur de `to` inconnue lève une `ValueError`.
+
+D'autres formats (LiteLLM, Pydantic AI) sont prévus.
 
 ## Observabilité
 
@@ -292,7 +317,7 @@ Le serveur n'écoute que sur ta machine (`127.0.0.1`), en lecture seule, et la p
 - Aucune vérification des capacités du modèle choisi (appel d'outils, vision).
 - Pas encore de calcul de coût ni de mesure du gain.
 - Les messages de la CLI sont en français. La raison de l'orchestrateur suit la langue de ton prompt.
-- Seul LangChain est officiellement pris en charge.
+- LangChain est l'intégration de référence : les exemples et les replis automatiques sont écrits pour lui. Avec `to="native"`, le choix du SDK et les replis sont à ta charge. LangChain reste installé avec Autoroute, qui l'utilise pour interroger l'orchestrateur.
 
 ## Sécurité
 

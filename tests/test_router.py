@@ -274,3 +274,65 @@ def test_decision_is_logged(config3, fake_llm):
     assert event["invalid_choice"] is False
     assert event["routing_failed"] is False
     assert event["error"] is None
+
+
+# --- format de sortie (to=) et fournisseurs ---
+
+@pytest.fixture
+def config_google(config3):
+    config3.models.append(ModelConfig(name="gemini-3.8-flash", provider="google_genai"))
+    config3.models.append(ModelConfig(name="mistral-small-latest", provider="mistralai"))
+    return config3
+
+
+def test_default_format_is_langchain(config_google, fake_llm):
+    fake_llm(Decision(choices=["google_genai:gemini-3.8-flash", "anthropic:claude-haiku-5-5"], reason="Code"))
+    r = route("Écris du code", config_google)
+    assert r.model == "google_genai:gemini-3.8-flash"
+    assert r.fallbacks == ["anthropic:claude-haiku-5-5"]
+
+
+def test_native_format_gives_official_names(config_google, fake_llm):
+    fake_llm(Decision(
+        choices=["google_genai:gemini-3.8-flash", "anthropic:claude-haiku-5-5", "mistralai:mistral-small-latest"],
+        reason="Code",
+    ))
+    r = route("Écris du code", config_google, to="native")
+    assert r.model == "gemini-3.8-flash"
+    assert r.fallbacks == ["claude-haiku-5-5", "mistral-small-latest"]
+
+
+@pytest.mark.parametrize("to", ["langchain", "native"])
+def test_providers_are_neutral_and_aligned(config_google, fake_llm, to):
+    fake_llm(Decision(
+        choices=["google_genai:gemini-3.8-flash", "openai:gpt-5-5", "mistralai:mistral-small-latest"],
+        reason="Code",
+    ))
+    r = route("Écris du code", config_google, to=to)
+    assert r.providers == ["google", "openai", "mistral"]
+    assert r.provider == "google"
+    assert len(r.providers) == 1 + len(r.fallbacks)
+
+
+def test_native_format_when_not_routed(config, monkeypatch):
+    monkeypatch.setattr("autoroute.router.init_chat_model", lambda spec, **kw: 1 / 0)
+    r = route("Une tâche", config, to="native")
+    assert r.routed is False
+    assert r.model == "claude-sonnet-4-6"
+    assert r.provider == "anthropic"
+
+
+def test_log_keeps_provider_name_format_whatever_to(config_google, fake_llm):
+    fake_llm(Decision(choices=["google_genai:gemini-3.8-flash", "anthropic:claude-haiku-5-5"], reason="Code"))
+    route("Écris du code", config_google, to="native")
+    event = read_log()[0]
+    assert event["model"] == "google_genai:gemini-3.8-flash"
+    assert event["candidates"] == ["google_genai:gemini-3.8-flash", "anthropic:claude-haiku-5-5"]
+
+
+def test_unknown_format_raises_before_any_call(config, monkeypatch):
+    called = []
+    monkeypatch.setattr("autoroute.router.init_chat_model", lambda spec, **kw: called.append(spec))
+    with pytest.raises(ValueError, match="to='litelm' inconnu. Valeurs acceptées : langchain, native"):
+        route("Une tâche", config, to="litelm")
+    assert called == []
