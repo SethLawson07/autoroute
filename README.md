@@ -29,7 +29,7 @@ Autoroute n'appelle **pas** le modèle : il te renvoie une chaîne `fournisseur:
 
 1. **Découverte** : Autoroute interroge l'API de liste des modèles de chaque fournisseur dont la clé est renseignée, et garde les modèles de chat. Il n'y a aucune liste de modèles à maintenir.
 2. **Routage** : un **orchestrateur**, modèle léger choisi automatiquement parmi tes modèles pour que le routage reste rapide et peu coûteux (ou celui que tu choisis dans `.autoroute/config.yaml`), reçoit ton prompt et cette liste. Il renvoie le modèle le plus adapté, jusqu'à 2 replis, et la raison de son choix. Sa réponse est limitée aux modèles découverts.
-3. **Log** : chaque décision est écrite dans un log JSONL. Si tu passes `r.tracker()` à LangChain, le log indique aussi quel modèle a réellement répondu (et les éventuels replis).
+3. **Log** : chaque décision est écrite dans un log JSONL.
 
 ## Installation
 
@@ -173,7 +173,6 @@ r.reason          # pourquoi ce modèle
 r.invalid_choice  # True si l'orchestrateur a cité un modèle inexistant : Autoroute utilise alors l'orchestrateur lui-même
 r.routing_failed  # True si aucun orchestrateur n'a répondu : le modèle renvoyé n'a pas été choisi pour ta tâche
 r.decision_id     # identifiant de ce routage, pour le retrouver dans le log
-r.tracker()       # à passer à LangChain pour que le log note ce qui s'est vraiment passé (voir « Le tracker »)
 ```
 
 ### Modèle de chat, avec replis
@@ -190,7 +189,7 @@ r = route_with_reason(prompt)
 primary, *backups = r.candidates
 
 model = init_chat_model(primary).with_fallbacks([init_chat_model(m) for m in backups])
-print(model.invoke(prompt, config={"callbacks": [r.tracker()]}).content)
+print(model.invoke(prompt).content)
 ```
 
 ### Agent, avec replis
@@ -211,16 +210,10 @@ agent = create_agent(
     tools=[...],
     middleware=[ModelFallbackMiddleware(*backups)] if backups else [],
 )
-agent.invoke({"messages": [{"role": "user", "content": prompt}]}, config={"callbacks": [r.tracker()]})
+agent.invoke({"messages": [{"role": "user", "content": prompt}]})
 ```
 
-### Le tracker
-
-`r.tracker()` est optionnel. Il n'appelle rien : il **observe** l'appel et enregistre quel modèle a vraiment répondu, combien de replis ont servi, quelles tentatives ont échoué et les tokens consommés. Une erreur dans le tracker ne fait jamais échouer ton appel.
-
-Sans tracker, le log dit ce qui a été **choisi**. Avec, il dit ce qui s'est **passé**. Par exemple : le modèle choisi était en panne, LangChain est passé au premier repli, qui a répondu en consommant 850 tokens.
-
-Tout outil de l'écosystème LangChain qui accepte un modèle de chat (LangGraph, Deep Agents…) fonctionne de la même façon : passe-lui `init_chat_model(r.model)`, et le tracker dans `config`.
+Tout outil de l'écosystème LangChain qui accepte un modèle de chat (LangGraph, Deep Agents…) fonctionne de la même façon : passe-lui `init_chat_model(r.model)`.
 
 ### Exemples
 
@@ -228,14 +221,14 @@ Voir [`examples/`](examples) :
 
 | Fichier | Montre |
 |---|---|
-| `01_chat_model.py` | Modèle de chat avec replis et tracker |
-| `02_agent.py` | Agent avec `ModelFallbackMiddleware` et tracker |
+| `01_chat_model.py` | Modèle de chat avec replis |
+| `02_agent.py` | Agent avec `ModelFallbackMiddleware` |
 | `03_modes.py` | Routage de tâches simples et complexes |
 | `04_fallback.py` | Un vrai repli, avec un modèle principal forcé en échec |
 
 ### Autres outils
 
-Hors de LangChain, Autoroute te fournit déjà le fournisseur et le modèle à utiliser. La suite n'est pas encore prise en charge : choisir le bon SDK, appeler le modèle, gérer les replis. Le tracker ne fonctionne pas non plus. Pour un SDK qui n'attend que le nom du modèle (OpenAI, Anthropic…) :
+Hors de LangChain, Autoroute te fournit déjà le fournisseur et le modèle à utiliser. La suite n'est pas encore prise en charge : choisir le bon SDK, appeler le modèle, gérer les replis. Pour un SDK qui n'attend que le nom du modèle (OpenAI, Anthropic…) :
 
 ```python
 provider, name = route(prompt).split(":", 1)
@@ -243,9 +236,9 @@ provider, name = route(prompt).split(":", 1)
 
 ## Observabilité
 
-Le log te permet de comprendre chaque choix, de voir quand les replis servent, et de suivre les tokens consommés. Il reste sur ta machine.
+Le log te permet de comprendre chaque choix. Il reste sur ta machine.
 
-Tout est ajouté à `.autoroute/log.jsonl`, un objet JSON par ligne. Il y a deux types d'événements, liés par `decision_id`. Le champ `schema_version` change si le format du log évolue : utile si tu le lis avec un script.
+Tout est ajouté à `.autoroute/log.jsonl`, un objet JSON par ligne. Le champ `schema_version` change si le format du log évolue : utile si tu le lis avec un script.
 
 Sous Windows PowerShell 5.1, lis-le avec `Get-Content .autoroute/log.jsonl -Encoding UTF8`, sinon les accents s'affichent mal.
 
@@ -267,25 +260,6 @@ Sous Windows PowerShell 5.1, lis-le avec `Get-Content .autoroute/log.jsonl -Enco
 | `latency_ms` | Durée du routage |
 | `mode` | Mode utilisé |
 | `error` | Erreurs des orchestrateurs qui n'ont pas répondu (y compris si un orchestrateur de secours a pris le relais) |
-
-### `outcome` (résultat) : écrite à chaque appel du modèle final, si le tracker est passé
-
-Ici, même `decision_id` que ci-dessus : le modèle choisi a atteint sa limite de requêtes, et le premier repli a répondu.
-
-```json
-{"schema_version": "2", "timestamp": "2026-11-07T12:48:31+00:00", "event": "outcome", "decision_id": "ae3a775c…", "primary": "openai:gpt-5-mini", "served_by": "google_genai:gemini-3.8-flash", "calls": 1, "fallbacks_used": 1, "failures": [{"model": "openai:gpt-5-mini", "error": "RateLimitError: ..."}], "usage": {"input_tokens": 18, "output_tokens": 420}, "latency_ms": 4213, "error": null}
-```
-
-| Champ | Signification |
-|---|---|
-| `primary` | Modèle choisi par l'orchestrateur |
-| `served_by` | Modèle qui a réellement répondu (`null` si tous ont échoué) |
-| `calls` | Appels réussis (plusieurs pour un agent qui utilise des outils) |
-| `fallbacks_used` | Appels réussis servis par un repli |
-| `failures` | Tentatives en échec, avec le modèle et l'erreur |
-| `usage` | Tokens consommés (`input_tokens`, `output_tokens`) |
-| `latency_ms` | Durée totale de l'appel, replis compris |
-| `error` | L'erreur reçue par ton code si tous les modèles ont échoué |
 
 > **Le log contient tes prompts.** Il est ignoré par git. Ne le partage pas si tes prompts sont sensibles.
 
@@ -309,9 +283,9 @@ Ici, même `decision_id` que ci-dessus : le modèle choisi a atteint sa limite d
 - Un fournisseur peut lister un modèle que ta clé ne peut pas appeler : s'il est choisi, les replis prennent le relais.
 - Un seul choix par prompt : pas de re-routage à chaque étape d'un agent.
 - Aucune vérification des capacités du modèle choisi (appel d'outils, vision).
-- Pas encore de calcul de coût ni de mesure du gain : le log enregistre les tokens, pas les prix.
+- Pas encore de calcul de coût ni de mesure du gain.
 - Les messages de la CLI sont en français. La raison de l'orchestrateur suit la langue de ton prompt.
-- Seul LangChain est officiellement pris en charge, et le tracker ne fonctionne qu'avec LangChain.
+- Seul LangChain est officiellement pris en charge.
 
 ## Sécurité
 

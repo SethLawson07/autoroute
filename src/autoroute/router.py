@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 
 from autoroute.catalog import discover_config, pick_spread
 from autoroute.config import Config, ModelConfig, get_mode
-from autoroute.observability import OutcomeTracker, log_decision
+from autoroute.observability import log_decision
 
 
 MAX_CANDIDATES = 3  # le choix principal + 2 replis au plus
@@ -25,10 +25,6 @@ class RouteResult(BaseModel):
     invalid_choice: bool = False  # l'orchestrateur n'a donné aucun nom valide : repli sur lui
     routing_failed: bool = False  # aucun orchestrateur n'a répondu : repli sur un modèle découvert
     decision_id: str = Field(default_factory=lambda: uuid4().hex)
-
-    def tracker(self) -> OutcomeTracker:
-        """Callback à passer à invoke : enregistre le modèle qui a vraiment répondu."""
-        return OutcomeTracker(self.decision_id, self.candidates)
 
 
 def _find(config: Config, value: str) -> ModelConfig | None:

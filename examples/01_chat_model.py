@@ -12,5 +12,4 @@ print(f"Modèle choisi : {primary}  (replis : {backups})")
 # If the primary model fails (rate limit, outage, no access...), LangChain tries the next one.
 model = init_chat_model(primary).with_fallbacks([init_chat_model(m) for m in backups])
 
-# The tracker logs which model actually answered, the fallbacks used and the tokens.
-print(model.invoke(task, config={"callbacks": [r.tracker()]}).content)
+print(model.invoke(task).content)

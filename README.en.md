@@ -29,7 +29,7 @@ Autoroute does **not** call the model: it returns a `provider:name` string that 
 
 1. **Discovery**: Autoroute queries the model-listing API of every provider whose key is set, and keeps the chat models. There is no model list to maintain.
 2. **Routing**: an **orchestrator**, a lightweight model picked automatically among your models to keep routing fast and cheap (or the one you choose in `.autoroute/config.yaml`), receives your prompt and that list. It returns the most suitable model, up to 2 fallbacks, and the reason for its choice. Its answer is restricted to the discovered models.
-3. **Logging**: every decision is written to a JSONL log. If you pass `r.tracker()` to LangChain, the log also shows which model actually answered (and any fallbacks).
+3. **Logging**: every decision is written to a JSONL log.
 
 ## Installation
 
@@ -173,7 +173,6 @@ r.reason          # why this model
 r.invalid_choice  # True if the orchestrator named a model that doesn't exist: Autoroute then uses the orchestrator itself
 r.routing_failed  # True if no orchestrator answered: the returned model was not chosen for your task
 r.decision_id     # ID of this routing, to find it in the log
-r.tracker()       # pass it to LangChain so the log records what actually happened (see "The tracker")
 ```
 
 ### Chat model, with fallbacks
@@ -190,7 +189,7 @@ r = route_with_reason(prompt)
 primary, *backups = r.candidates
 
 model = init_chat_model(primary).with_fallbacks([init_chat_model(m) for m in backups])
-print(model.invoke(prompt, config={"callbacks": [r.tracker()]}).content)
+print(model.invoke(prompt).content)
 ```
 
 ### Agent, with fallbacks
@@ -211,16 +210,10 @@ agent = create_agent(
     tools=[...],
     middleware=[ModelFallbackMiddleware(*backups)] if backups else [],
 )
-agent.invoke({"messages": [{"role": "user", "content": prompt}]}, config={"callbacks": [r.tracker()]})
+agent.invoke({"messages": [{"role": "user", "content": prompt}]})
 ```
 
-### The tracker
-
-`r.tracker()` is optional. It does not call anything: it **observes** the call and logs which model actually answered, how many fallbacks were used, which attempts failed, and the tokens used. An error inside the tracker never breaks your call.
-
-Without the tracker, the log says what was **chosen**. With it, the log says what **happened**. For example: the chosen model was down, LangChain moved on to the first fallback, which answered using 850 tokens.
-
-Any tool in the LangChain ecosystem that accepts a chat model (LangGraph, Deep Agents…) works the same way: pass it `init_chat_model(r.model)`, and the tracker in `config`.
+Any tool in the LangChain ecosystem that accepts a chat model (LangGraph, Deep Agents…) works the same way: pass it `init_chat_model(r.model)`.
 
 ### Examples
 
@@ -228,14 +221,14 @@ See [`examples/`](https://github.com/SethLawson07/autoroute/tree/main/examples):
 
 | File | Shows |
 |---|---|
-| `01_chat_model.py` | Chat model with fallbacks and tracker |
-| `02_agent.py` | Agent with `ModelFallbackMiddleware` and tracker |
+| `01_chat_model.py` | Chat model with fallbacks |
+| `02_agent.py` | Agent with `ModelFallbackMiddleware` |
 | `03_modes.py` | Routing of simple and complex tasks |
 | `04_fallback.py` | A real fallback, with a primary model forced to fail |
 
 ### Other tools
 
-Outside LangChain, Autoroute already gives you the provider and the model to use. What comes next is not supported yet: picking the right SDK, calling the model, handling fallbacks. The tracker doesn't work either. For an SDK that only expects the model name (OpenAI, Anthropic…):
+Outside LangChain, Autoroute already gives you the provider and the model to use. What comes next is not supported yet: picking the right SDK, calling the model, handling fallbacks. For an SDK that only expects the model name (OpenAI, Anthropic…):
 
 ```python
 provider, name = route(prompt).split(":", 1)
@@ -243,9 +236,9 @@ provider, name = route(prompt).split(":", 1)
 
 ## Observability
 
-The log lets you understand every choice, see when fallbacks are used, and track the tokens consumed. It stays on your machine.
+The log lets you understand every choice. It stays on your machine.
 
-Everything is appended to `.autoroute/log.jsonl`, one JSON object per line. There are two event types, linked by `decision_id`. The `schema_version` field changes if the log format evolves: useful if you read it with a script.
+Everything is appended to `.autoroute/log.jsonl`, one JSON object per line. The `schema_version` field changes if the log format evolves: useful if you read it with a script.
 
 On Windows PowerShell 5.1, read it with `Get-Content .autoroute/log.jsonl -Encoding UTF8`, otherwise accents are garbled.
 
@@ -267,25 +260,6 @@ On Windows PowerShell 5.1, read it with `Get-Content .autoroute/log.jsonl -Encod
 | `latency_ms` | Routing time |
 | `mode` | Mode used |
 | `error` | Errors from orchestrators that didn't answer (including when a backup orchestrator took over) |
-
-### `outcome`: written on every call to the final model, if the tracker is passed
-
-Same `decision_id` as above: the chosen model hit its rate limit, and the first fallback answered.
-
-```json
-{"schema_version": "2", "timestamp": "2026-11-07T12:48:31+00:00", "event": "outcome", "decision_id": "ae3a775c…", "primary": "openai:gpt-5-mini", "served_by": "google_genai:gemini-3.8-flash", "calls": 1, "fallbacks_used": 1, "failures": [{"model": "openai:gpt-5-mini", "error": "RateLimitError: ..."}], "usage": {"input_tokens": 18, "output_tokens": 420}, "latency_ms": 4213, "error": null}
-```
-
-| Field | Meaning |
-|---|---|
-| `primary` | Model chosen by the orchestrator |
-| `served_by` | Model that actually answered (`null` if all failed) |
-| `calls` | Successful model calls (several for an agent that uses tools) |
-| `fallbacks_used` | Successful calls served by a fallback |
-| `failures` | Failed attempts, with model and error |
-| `usage` | Tokens used (`input_tokens`, `output_tokens`) |
-| `latency_ms` | Total call time, fallbacks included |
-| `error` | The error your code received if every model failed |
 
 > **The log contains your prompts.** It is ignored by git. Do not share it if your prompts are sensitive.
 
@@ -309,9 +283,9 @@ Same `decision_id` as above: the chosen model hit its rate limit, and the first 
 - A provider may list a model your key cannot call: if it is chosen, the fallbacks take over.
 - One choice per prompt: no re-routing at each step of an agent.
 - No check of the chosen model's capabilities (tool calling, vision).
-- No cost calculation or savings measurement yet: the log records tokens, not prices.
+- No cost calculation or savings measurement yet.
 - CLI messages are in French. The orchestrator's reason follows the language of your prompt.
-- Only LangChain is officially supported, and the tracker only works with LangChain.
+- Only LangChain is officially supported.
 
 ## Security
 

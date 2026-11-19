@@ -24,9 +24,5 @@ agent = create_agent(
     middleware=[ModelFallbackMiddleware(*backups)] if backups else [],
 )
 
-# The tracker logs which model actually answered, the fallbacks used and the tokens.
-result = agent.invoke(
-    {"messages": [{"role": "user", "content": task}]},
-    config={"callbacks": [r.tracker()]},
-)
+result = agent.invoke({"messages": [{"role": "user", "content": task}]})
 print(result["messages"][-1].content)

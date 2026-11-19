@@ -42,7 +42,6 @@
     <text x="540" y="270">model</text>
     <text x="790" y="254" font-family="Consolas, Menlo, monospace" font-size="12">.autoroute/</text>
     <text x="790" y="270" font-family="Consolas, Menlo, monospace" font-size="12">log.jsonl</text>
-    <text x="700" y="242" font-family="Consolas, Menlo, monospace" font-size="12">r.tracker()</text>
   </g>
 
   <g fill="none" stroke="#555" stroke-width="1.5" marker-end="url(#arrow)">
@@ -52,6 +51,5 @@
     <path d="M680,120 V175 H290 V223"/>
     <path d="M785,120 V208"/>
     <path d="M400,255 H433"/>
-    <path d="M645,255 H738" stroke-dasharray="5,4"/>
   </g>
 </svg>
