@@ -47,6 +47,8 @@ try {
     if (-not (Test-Path .autoroute/config.yaml) -or -not (Test-Path .env.example)) {
         Write-Host "ÉCHEC : templates absents du paquet" -ForegroundColor Red; exit 1
     }
+    & (Join-Path (Split-Path $autoroute) "python.exe") -c "from importlib.resources import files; assert files('autoroute.templates').joinpath('ui.html').is_file()"
+    Check "ui.html dans le paquet"
     # PowerShell 5.1 : avec « Stop », stderr redirigé par 2>&1 deviendrait une erreur fatale.
     $ErrorActionPreference = "Continue"
     $out = & $autoroute models 2>&1 | Out-String

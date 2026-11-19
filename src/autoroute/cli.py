@@ -1,5 +1,6 @@
 import logging
 import re
+import webbrowser
 from contextlib import contextmanager
 from importlib.resources import files
 from pathlib import Path
@@ -10,6 +11,7 @@ import typer
 from autoroute.catalog import discover_config
 from autoroute.config import ENV_KEYS, MODES, config_path, ensure_parent, get_mode, key_source
 from autoroute.router import route
+from autoroute.ui import DEFAULT_PORT, HOST, log_file, make_server, read_decisions
 
 app = typer.Typer(help="Autoroute : choisit le bon modèle LLM pour une tâche.")
 
@@ -121,6 +123,31 @@ def route_cmd(task: str):
         typer.echo(f"Raison : {r.reason}")
         typer.echo(f"Routé  : {'oui' if r.routed else 'non (modèle par défaut)'}")
         typer.echo(f"Id     : {r.id}")
+
+
+@app.command()
+def ui(
+    log: str | None = typer.Option(
+        None, "--log", help="Fichier de log à lire (défaut : AUTOROUTE_LOG, sinon .autoroute/log.jsonl)",
+    ),
+    port: int = typer.Option(DEFAULT_PORT, "--port", "-p", help="Port local du serveur"),
+):
+    """Ouvre le log dans le navigateur (serveur local, lecture seule)."""
+    with _cli():
+        path = log_file(log)
+        read_decisions(path, limit=1)  # log absent ou illisible : erreur propre avant de démarrer
+        server = make_server(path, port)
+        url = f"http://{HOST}:{server.server_address[1]}"
+        typer.echo(f"Log : {path.as_posix()}")
+        typer.echo(f"Interface : {url}  (Ctrl+C pour arrêter)")
+        typer.echo("Accessible depuis cette machine uniquement : le log contient tes prompts.")
+        webbrowser.open(url)
+        try:
+            server.serve_forever()
+        except KeyboardInterrupt:
+            typer.echo("Arrêté.")
+        finally:
+            server.server_close()
 
 
 if __name__ == "__main__":

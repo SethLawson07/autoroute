@@ -53,6 +53,7 @@ copy .env.example .env           # macOS / Linux: cp .env.example .env
 # fill in at least one API key in .env (OpenAI, Anthropic, Gemini or Mistral)
 autoroute models                 # shows where each key comes from, and the discovered models
 autoroute route "Design the architecture of a secure payment API, with refund handling"
+autoroute ui                     # the decision log in your browser
 ```
 
 Sample output (CLI labels in French for now, see [Known limitations](#known-limitations)):
@@ -234,6 +235,18 @@ The log lets you understand every choice. It stays on your machine.
 Everything is appended to `.autoroute/log.jsonl`, one JSON object per line. The `schema_version` field changes if the log format evolves: useful if you read it with a script.
 
 On Windows PowerShell 5.1, read it with `Get-Content .autoroute/log.jsonl -Encoding UTF8`, otherwise accents are garbled.
+
+### `autoroute ui`: the log in your browser
+
+```powershell
+autoroute ui                     # opens http://127.0.0.1:8765
+autoroute ui --log prod.jsonl    # another file, for example a log copied from your production
+autoroute ui --port 9000         # another port
+```
+
+The page shows a summary (rate of unrouted decisions and invalid choices, mean latency, most chosen models and orchestrators), a table of the last 1,000 decisions with search and filters, and the details of each decision (task, reason, candidates, errors). The "Actualiser" (refresh) button rereads the log without restarting the command. `Ctrl+C` stops the server. The page labels are in French for now.
+
+The server only listens on your machine (`127.0.0.1`), read-only, and the page loads no external resources. Never expose it on a network: the log contains your prompts. For a remote server, copy the file and run `autoroute ui --log` locally, or use an SSH tunnel (`ssh -L 8765:127.0.0.1:8765 server`).
 
 ### `decision`: written on every routing call
 
