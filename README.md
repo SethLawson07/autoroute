@@ -302,15 +302,7 @@ Le serveur n'écoute que sur ta machine (`127.0.0.1`), en lecture seule, et la p
 - Le routage n'est pas déterministe : le même prompt peut recevoir des choix différents, mais raisonnables.
 - Le routage ajoute un appel payant et quelques secondes (environ 1 à 7 s selon l'orchestrateur, dans nos essais).
 - Pas encore de limite de temps sur l'orchestrateur : avec une clé gratuite à quota limité, le routage peut prendre plusieurs minutes.
-- Chaque appel à `route()` redécouvre les modèles (un appel à l'API de liste de chaque fournisseur). Pour l'éviter, découvre une fois et réutilise la config :
-
-  ```python
-  from autoroute import route
-  from autoroute.catalog import discover_config
-
-  config = discover_config()  # une fois (respecte AUTOROUTE_MODE)
-  route(prompt, config)       # ensuite, sans redécouverte
-  ```
+- Les modèles découverts sont gardés en mémoire 5 minutes : un nouveau modèle d'un fournisseur peut mettre jusqu'à 5 minutes à apparaître. Un changement de clé API, de `AUTOROUTE_MODE` ou de `.autoroute/config.yaml` est pris en compte tout de suite.
 
 - Un fournisseur peut lister un modèle que ta clé ne peut pas appeler : s'il est choisi, les replis prennent le relais.
 - Un seul choix par prompt : pas de re-routage à chaque étape d'un agent.

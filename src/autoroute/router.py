@@ -1,3 +1,4 @@
+import hashlib
 import logging
 import time
 from uuid import uuid4
@@ -6,11 +7,18 @@ from langchain.chat_models import init_chat_model
 from pydantic import BaseModel, ConfigDict, Field
 
 from autoroute.catalog import discover_config, pick_spread
-from autoroute.config import Config, ModelConfig, get_mode
+from autoroute.config import MODES, Config, ModelConfig, config_path, get_api_key, get_mode
 from autoroute.observability import log_decision
 
 
 MAX_CANDIDATES = 3  # le choix principal + 2 replis au plus
+
+# Durée de vie du cache de la découverte (route() sans config) : évite de rappeler l'API
+# de liste de chaque fournisseur à chaque routage.
+DISCOVERY_TTL = 300  # secondes
+
+# clé (mode, fichier de config, clés API) → (instant de la découverte, Config)
+_discovery_cache: dict[tuple, tuple[float, Config]] = {}
 
 # Pas de NullHandler : sans configuration, Python affiche quand même les WARNING sur stderr.
 logger = logging.getLogger(__name__)
@@ -150,6 +158,29 @@ def _last_resort(config: Config) -> list[str]:
     return pick_spread(others, providers, MAX_CANDIDATES) or config.orchestrators[:MAX_CANDIDATES]
 
 
+def _cache_key(mode: str) -> tuple:
+    """Ce dont dépend la découverte : un changement de mode, de config.yaml ou de clé API
+    invalide le cache. Les clés sont hachées : jamais gardées en clair hors de l'environnement."""
+    path = config_path().resolve()
+    mtime = path.stat().st_mtime if path.exists() else None
+    keys = hashlib.sha256(
+        "\n".join(get_api_key(p) or "" for p in MODES[mode]).encode()
+    ).hexdigest()
+    return (mode, str(path), mtime, keys)
+
+
+def _cached_discovery(mode: str) -> Config:
+    """discover_config(mode), gardé DISCOVERY_TTL secondes. Les échecs ne sont pas gardés."""
+    key = _cache_key(mode)
+    hit = _discovery_cache.get(key)
+    if hit and time.monotonic() - hit[0] < DISCOVERY_TTL:
+        return hit[1]
+    config = discover_config(mode=mode)
+    _discovery_cache.clear()  # une seule entrée : l'ancienne clé ne servira plus
+    _discovery_cache[key] = (time.monotonic(), config)
+    return config
+
+
 def _error_text(e: Exception) -> str:
     msg = " ".join(str(e).split())
     return f"{type(e).__name__}: {msg[:300]}"
@@ -175,7 +206,7 @@ def route(task: str, config: Config | None = None, to: str = "langchain") -> Rou
     if config is None:
         try:
             mode = get_mode()
-            config = discover_config(mode=mode)
+            config = _cached_discovery(mode)
         except Exception as e:
             log_decision(
                 decision_id=decision_id,

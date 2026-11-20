@@ -12,6 +12,8 @@ def isolated(tmp_path, monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
     for var in ("GOOGLE_API_KEY", "MISTRAL_API_KEY", "AUTOROUTE_MODE", "AUTOROUTE_CONFIG"):
         monkeypatch.delenv(var, raising=False)
+    # Le cache de la découverte ne doit pas passer d'un test à l'autre.
+    monkeypatch.setattr("autoroute.router._discovery_cache", {})
 
 
 @pytest.fixture

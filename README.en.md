@@ -302,15 +302,7 @@ The server only listens on your machine (`127.0.0.1`), read-only, and the page l
 - Routing is not deterministic: the same prompt can get different (reasonable) choices.
 - Routing adds one paid call and a few seconds (about 1 to 7 s depending on the orchestrator, in our tests).
 - No time limit on the orchestrator yet: with a free, rate-limited key, routing can take several minutes.
-- Every `route()` call rediscovers the models (one call to each provider's listing API). To avoid it, discover once and reuse the config:
-
-  ```python
-  from autoroute import route
-  from autoroute.catalog import discover_config
-
-  config = discover_config()  # once (honors AUTOROUTE_MODE)
-  route(prompt, config)       # then, without rediscovery
-  ```
+- Discovered models are kept in memory for 5 minutes: a provider's new model can take up to 5 minutes to show up. A change of API key, `AUTOROUTE_MODE` or `.autoroute/config.yaml` takes effect immediately.
 
 - A provider may list a model your key cannot call: if it is chosen, the fallbacks take over.
 - One choice per prompt: no re-routing at each step of an agent.

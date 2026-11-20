@@ -261,6 +261,84 @@ def test_route_without_config_discovers_with_env_mode(config, fake_llm, monkeypa
     assert read_log()[0]["mode"] == "anthropic"
 
 
+# --- cache de la découverte ---
+
+@pytest.fixture
+def counted_discovery(config, fake_llm, monkeypatch):
+    """discover_config simulé qui compte ses appels."""
+    calls = []
+
+    def fake_discover(mode="all", **kw):
+        calls.append(mode)
+        return config
+
+    monkeypatch.setattr("autoroute.router.discover_config", fake_discover)
+    fake_llm(Decision(choices=["openai:gpt-4o-mini"], reason="Simple"))
+    return calls
+
+
+def test_discovery_is_cached_between_routes(counted_discovery):
+    route("Tâche 1")
+    route("Tâche 2")
+    assert len(counted_discovery) == 1
+
+
+def test_discovery_cache_expires(counted_discovery, monkeypatch):
+    import autoroute.router as router
+
+    now = [1000.0]
+    monkeypatch.setattr(router.time, "monotonic", lambda: now[0])
+    route("Tâche 1")
+    now[0] += router.DISCOVERY_TTL + 1
+    route("Tâche 2")
+    assert len(counted_discovery) == 2
+
+
+def test_discovery_cache_depends_on_mode(counted_discovery, monkeypatch):
+    route("Tâche 1")
+    monkeypatch.setenv("AUTOROUTE_MODE", "anthropic")
+    route("Tâche 2")
+    assert counted_discovery == ["all", "anthropic"]
+
+
+def test_discovery_cache_depends_on_api_keys(counted_discovery, monkeypatch):
+    route("Tâche 1")
+    monkeypatch.setenv("OPENAI_API_KEY", "other-key")
+    route("Tâche 2")
+    assert len(counted_discovery) == 2
+
+
+def test_discovery_cache_depends_on_config_file(counted_discovery, tmp_path):
+    route("Tâche 1")
+    path = tmp_path / ".autoroute" / "config.yaml"
+    path.parent.mkdir()
+    path.write_text("orchestrators:\n  all: openai:gpt-4o-mini\n", encoding="utf-8")
+    route("Tâche 2")
+    assert len(counted_discovery) == 2
+
+
+def test_discovery_failure_is_not_cached(config, fake_llm, monkeypatch):
+    calls = []
+
+    def flaky(mode="all", **kw):
+        calls.append(mode)
+        if len(calls) == 1:
+            raise ValueError("Aucun modèle trouvé")
+        return config
+
+    monkeypatch.setattr("autoroute.router.discover_config", flaky)
+    fake_llm(Decision(choices=["openai:gpt-4o-mini"], reason="Simple"))
+    with pytest.raises(ValueError):
+        route("Tâche 1")
+    assert route("Tâche 2").routed is True
+    assert len(calls) == 2
+
+
+def test_explicit_config_skips_discovery(counted_discovery, config):
+    route("Tâche", config)
+    assert counted_discovery == []
+
+
 def test_decision_is_logged(config3, fake_llm):
     fake_llm(Decision(choices=["anthropic:claude-sonnet-4-6", "openai:gpt-5-5"], reason="Tâche de code"))
     r = route("Écris du code", config3)
