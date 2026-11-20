@@ -56,14 +56,14 @@ autoroute route "Design the architecture of a secure payment API, with refund ha
 autoroute ui                     # the decision log in your browser
 ```
 
-Sample output (CLI labels in French for now, see [Known limitations](#known-limitations)):
+Sample output:
 
 ```
-Modèle : anthropic:claude-opus-5-5
-Replis : openai:gpt-5, google_genai:gemini-3.1-pro-preview
-Raison : Complex architecture design with security requirements: a powerful model is needed.
-Routé  : oui
-Id     : ae3a775c9f1e4b0d8c2a6e1f3b5d7a90
+Model:     anthropic:claude-opus-5-5
+Fallbacks: openai:gpt-5, google_genai:gemini-3.1-pro-preview
+Reason:    Complex architecture design with security requirements: a powerful model is needed.
+Routed:    yes
+Id:        ae3a775c9f1e4b0d8c2a6e1f3b5d7a90
 ```
 
 In your code:
@@ -318,7 +318,7 @@ The server only listens on your machine (`127.0.0.1`), read-only, and the page l
 - One choice per prompt: no re-routing at each step of an agent.
 - No check of the chosen model's capabilities (tool calling, vision).
 - No cost calculation or savings measurement yet.
-- CLI messages are in French. The orchestrator's reason follows the language of your prompt.
+- The orchestrator's reason follows the language of your prompt. The `autoroute ui` page is still in French.
 - LangChain is the reference integration: the examples and automatic fallbacks are written for it. With `to="native"`, picking the SDK and handling fallbacks are up to you. LangChain is still installed with Autoroute, which uses it to query the orchestrator.
 
 ## Security

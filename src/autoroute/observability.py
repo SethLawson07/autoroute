@@ -34,7 +34,7 @@ def _log_path() -> Path:
     """Le fichier de log. Lève ValueError si AUTOROUTE_LOG vaut stdout ou off (pas de fichier)."""
     target = _log_target()
     if isinstance(target, str):
-        raise ValueError(f"AUTOROUTE_LOG={target} : aucun fichier de log. Indique un fichier avec --log.")
+        raise ValueError(f"AUTOROUTE_LOG={target}: no log file. Pass a file with --log.")
     return target
 
 
@@ -66,8 +66,8 @@ def _write(event: dict) -> None:
         if str(path) not in _unwritable:
             _unwritable.add(str(path))
             logger.warning(
-                f"Log {path.as_posix()} impossible à écrire ({type(e).__name__}) : "
-                "décisions non enregistrées. Change AUTOROUTE_LOG vers un dossier accessible en écriture."
+                f"Cannot write log {path.as_posix()} ({type(e).__name__}): "
+                "decisions are not recorded. Point AUTOROUTE_LOG to a writable folder."
             )
 
 

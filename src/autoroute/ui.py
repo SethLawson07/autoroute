@@ -46,8 +46,8 @@ def read_decisions(path: Path, limit: int = MAX_DECISIONS) -> dict:
     """
     if not path.is_file():
         raise ValueError(
-            f"Aucun log trouvé : {path.as_posix()}. Lance d'abord un routage "
-            "(autoroute route \"…\"), ou indique un fichier avec --log."
+            f"No log found: {path.as_posix()}. Run a routing first "
+            "(autoroute route \"…\"), or pass a file with --log."
         )
     decisions: list[dict] = []
     skipped = 0
@@ -158,7 +158,7 @@ def make_server(path: Path, port: int = DEFAULT_PORT) -> ThreadingHTTPServer:
         server = _Server((HOST, port), make_handler(path))
     except OSError as e:
         raise ValueError(
-            f"Impossible d'ouvrir le port {port} ({e.strerror or e}) : il est peut-être déjà utilisé. "
-            "Essaie un autre port avec --port."
+            f"Cannot open port {port} ({e.strerror or e}): it may already be in use. "
+            "Try another port with --port."
         ) from None
     return server

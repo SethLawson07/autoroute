@@ -59,7 +59,7 @@ def test_read_decisions_keeps_only_the_most_recent(tmp_path):
 
 
 def test_missing_log_is_a_clean_error(tmp_path):
-    with pytest.raises(ValueError, match="Aucun log trouvé"):
+    with pytest.raises(ValueError, match="No log found"):
         ui.read_decisions(tmp_path / "absent.jsonl")
 
 
@@ -171,7 +171,7 @@ def test_busy_port_is_a_clean_error(server):
 def test_cli_ui_without_log_is_clean(tmp_path):
     result = runner.invoke(app, ["ui", "--log", str(tmp_path / "absent.jsonl")])
     assert result.exit_code == 1
-    assert "Aucun log trouvé" in result.output
+    assert "No log found" in result.output
     assert "Traceback" not in result.output
 
 

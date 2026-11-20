@@ -76,7 +76,7 @@ def test_unwritable_log_warns_once_and_does_not_raise(monkeypatch, tmp_path, cap
         log_once()
     warnings = [r.getMessage() for r in caplog.records if r.levelname == "WARNING"]
     assert len(warnings) == 1
-    assert "impossible à écrire" in warnings[0]
+    assert "Cannot write log" in warnings[0]
     assert "tâche" not in warnings[0]  # le texte de la tâche ne fuit pas dans le WARNING
     assert not path.exists()
 

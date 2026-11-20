@@ -82,10 +82,10 @@ def test_key_source_dotenv_ignored(monkeypatch):
 
 
 @pytest.mark.parametrize("content, why", [
-    ("orchestrators:\n  all: : :\n", "ligne 2"),
+    ("orchestrators:\n  all: : :\n", "line 2"),
     ("- a\n- b\n", "orchestrators:"),
-    ("orchestrators: [a, b]\n", "associer un mode"),
-    ("orchestrators:\n  all: [a, b]\n", "provider:nom"),
+    ("orchestrators: [a, b]\n", "map a mode"),
+    ("orchestrators:\n  all: [a, b]\n", "provider:name"),
 ])
 def test_unreadable_config_warns_and_means_automatic(content, why, caplog):
     write_config(content)

@@ -56,13 +56,13 @@ def test_resolve_qualified():
 
 
 def test_resolve_unknown_raises():
-    with pytest.raises(ValueError, match="introuvable"):
+    with pytest.raises(ValueError, match="not found"):
         catalog._resolve_orchestrator("inconnu", models())
 
 
 def test_resolve_ambiguous_raises():
     both = [ModelConfig(name="x", provider="openai"), ModelConfig(name="x", provider="anthropic")]
-    with pytest.raises(ValueError, match="plusieurs"):
+    with pytest.raises(ValueError, match="several providers"):
         catalog._resolve_orchestrator("x", both)
 
 
@@ -82,7 +82,7 @@ def test_discover_without_keys_raises(monkeypatch):
     write_config("orchestrators:\n  all: gpt-4o-mini\n")
     monkeypatch.delenv("OPENAI_API_KEY")
     monkeypatch.delenv("ANTHROPIC_API_KEY")
-    with pytest.raises(ValueError, match="Aucun modèle"):
+    with pytest.raises(ValueError, match="No model found"):
         catalog.discover_config()
 
 def fake_models(monkeypatch, by_provider):
@@ -168,7 +168,7 @@ def test_unexpected_api_response_is_a_clean_error(monkeypatch):
         return {}["data"]  # KeyError : le fournisseur a changé sa réponse
 
     monkeypatch.setattr(catalog, "list_models", changed_format)
-    with pytest.raises(ValueError, match="réponse inattendue"):
+    with pytest.raises(ValueError, match="unexpected API response"):
         catalog.list_chat_models("openai")
 
 
@@ -180,5 +180,5 @@ def test_unexpected_api_response_skips_only_that_provider(monkeypatch, caplog):
 
     monkeypatch.setattr(catalog, "list_models", list_models)
     config = catalog.discover_config()
-    assert "openai : réponse inattendue" in caplog.text
+    assert "openai: unexpected API response" in caplog.text
     assert [m.spec for m in config.models] == ["anthropic:claude-haiku-5-5"]

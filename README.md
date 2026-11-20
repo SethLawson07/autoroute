@@ -59,11 +59,11 @@ autoroute ui                     # le log des décisions dans ton navigateur
 Exemple de sortie :
 
 ```
-Modèle : anthropic:claude-opus-5-5
-Replis : openai:gpt-5, google_genai:gemini-3.1-pro-preview
-Raison : Conception d'architecture complexe avec enjeux de sécurité : un modèle puissant est nécessaire.
-Routé  : oui
-Id     : ae3a775c9f1e4b0d8c2a6e1f3b5d7a90
+Model:     anthropic:claude-opus-5-5
+Fallbacks: openai:gpt-5, google_genai:gemini-3.1-pro-preview
+Reason:    Conception d'architecture complexe avec enjeux de sécurité : un modèle puissant est nécessaire.
+Routed:    yes
+Id:        ae3a775c9f1e4b0d8c2a6e1f3b5d7a90
 ```
 
 Dans ton code :
@@ -318,7 +318,7 @@ Le serveur n'écoute que sur ta machine (`127.0.0.1`), en lecture seule, et la p
 - Un seul choix par prompt : pas de re-routage à chaque étape d'un agent.
 - Aucune vérification des capacités du modèle choisi (appel d'outils, vision).
 - Pas encore de calcul de coût ni de mesure du gain.
-- Les messages de la CLI sont en français. La raison de l'orchestrateur suit la langue de ton prompt.
+- Les messages de la CLI et les avertissements sont en anglais. La raison de l'orchestrateur suit la langue de ton prompt. La page de `autoroute ui` est encore en français.
 - LangChain est l'intégration de référence : les exemples et les replis automatiques sont écrits pour lui. Avec `to="native"`, le choix du SDK et les replis sont à ta charge. LangChain reste installé avec Autoroute, qui l'utilise pour interroger l'orchestrateur.
 
 ## Sécurité

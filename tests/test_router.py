@@ -136,8 +136,8 @@ def test_invalid_choice_without_backup_is_last_resort(config, fake_llm, choices,
     event = read_log()[0]
     assert event["invalid_choice"] is True
     assert event["routing_failed"] is True
-    assert "choix invalide" in event["error"]
-    assert any("Aucun orchestrateur" in w for w in warnings_of(caplog))
+    assert "invalid choice" in event["error"]
+    assert any("No orchestrator answered" in w for w in warnings_of(caplog))
 
 
 def test_invalid_choice_tries_backup_orchestrator(config, fake_orchestrators, caplog):
@@ -155,8 +155,8 @@ def test_invalid_choice_tries_backup_orchestrator(config, fake_orchestrators, ca
     assert event["invalid_choice"] is True
     assert event["routing_failed"] is False
     assert warnings_of(caplog) == [
-        "Orchestrateur en échec : openai:gpt-4o-mini. Secours utilisé : anthropic:claude-sonnet-4-6. "
-        "Détail de l'erreur dans le log."
+        "Orchestrator failed: openai:gpt-4o-mini. Backup used: anthropic:claude-sonnet-4-6. "
+        "Error details in the log."
     ]
 
 
@@ -172,12 +172,12 @@ def test_orchestrator_failure_does_not_raise(config, monkeypatch, caplog):
     # Un modèle découvert qui n'est pas l'orchestrateur en échec.
     assert r.model == "anthropic:claude-sonnet-4-6"
     assert config.orchestrator not in [r.model, *r.fallbacks]
-    assert "Aucun orchestrateur" in r.reason
+    assert "No orchestrator answered" in r.reason
     event = read_log()[0]
     assert event["routing_failed"] is True
     assert "panne" in event["error"]
     [warning] = warnings_of(caplog)
-    assert "Aucun orchestrateur n'a répondu (openai:gpt-4o-mini) : repli sur anthropic:claude-sonnet-4-6" in warning
+    assert "No orchestrator answered (openai:gpt-4o-mini): falling back to anthropic:claude-sonnet-4-6" in warning
 
 
 def test_failure_is_a_log_record_not_a_python_warning(config, monkeypatch, recwarn):
@@ -233,7 +233,7 @@ def test_backup_orchestrator_used_when_first_fails(config, fake_orchestrators, c
     event = read_log()[0]
     assert event["orchestrator"] == "anthropic:claude-sonnet-4-6"
     assert "quota" in event["error"]
-    assert any("Secours utilisé : anthropic:claude-sonnet-4-6" in w for w in warnings_of(caplog))
+    assert any("Backup used: anthropic:claude-sonnet-4-6" in w for w in warnings_of(caplog))
 
 
 # --- limite de temps de l'orchestrateur ---
@@ -461,6 +461,6 @@ def test_log_keeps_provider_name_format_whatever_to(config_google, fake_llm):
 def test_unknown_format_raises_before_any_call(config, monkeypatch):
     called = []
     monkeypatch.setattr("autoroute.router.init_chat_model", lambda spec, **kw: called.append(spec))
-    with pytest.raises(ValueError, match="to='litelm' inconnu. Valeurs acceptées : langchain, native"):
+    with pytest.raises(ValueError, match="Unknown to='litelm'. Accepted values: langchain, native"):
         route("Une tâche", config, to="litelm")
     assert called == []

@@ -85,13 +85,13 @@ def load_orchestrator(path: str | None = None, mode: str = "all") -> str | None:
         return None
 
     def unreadable(why: str) -> None:
-        logger.warning(f"{p.as_posix()} illisible ({why}) : choix automatique de l'orchestrateur.")
+        logger.warning(f"{p.as_posix()} is unreadable ({why}): the orchestrator is picked automatically.")
 
     try:
         data = yaml.safe_load(p.read_text(encoding="utf-8")) or {}
     except yaml.YAMLError as e:
         mark = getattr(e, "problem_mark", None)
-        unreadable(f"YAML invalide, ligne {mark.line + 1}" if mark else "YAML invalide")
+        unreadable(f"invalid YAML, line {mark.line + 1}" if mark else "invalid YAML")
         return None
     except (OSError, UnicodeDecodeError) as e:
         unreadable(type(e).__name__)
@@ -100,17 +100,17 @@ def load_orchestrator(path: str | None = None, mode: str = "all") -> str | None:
     orchestrators = data.get("orchestrators") if isinstance(data, dict) else None
     if orchestrators is None:
         if not isinstance(data, dict):
-            unreadable("le fichier doit contenir « orchestrators: »")
+            unreadable("the file must contain 'orchestrators:'")
         return None
     if not isinstance(orchestrators, dict):
-        unreadable("« orchestrators » doit associer un mode à un modèle, ex. « all: provider:nom »")
+        unreadable("'orchestrators' must map a mode to a model, e.g. 'all: provider:name'")
         return None
 
     value = orchestrators.get(mode)
     if value is None:
         return None
     if not isinstance(value, str):
-        unreadable(f"orchestrators.{mode} doit être un texte au format provider:nom")
+        unreadable(f"orchestrators.{mode} must be a string like provider:name")
         return None
     return value.strip() or None
 
@@ -119,7 +119,7 @@ def get_mode() -> str:
     load_env()
     value = (os.getenv("AUTOROUTE_MODE") or "all").strip().lower()
     if value not in MODES:
-        raise ValueError(f"AUTOROUTE_MODE doit valoir : {', '.join(MODES)}")
+        raise ValueError(f"AUTOROUTE_MODE must be one of: {', '.join(MODES)}")
     return value
 
 

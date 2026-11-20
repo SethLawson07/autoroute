@@ -206,7 +206,7 @@ def route(task: str, config: Config | None = None, to: str = "langchain") -> Rou
     """
     if to not in FORMATS:
         # Erreur de code, pas une panne de routage : visible tout de suite, avant tout appel.
-        raise ValueError(f"to={to!r} inconnu. Valeurs acceptées : {', '.join(FORMATS)}.")
+        raise ValueError(f"Unknown to={to!r}. Accepted values: {', '.join(FORMATS)}.")
     start = time.perf_counter()
     decision_id = uuid4().hex
     mode = "custom" if config else "all"
@@ -241,7 +241,7 @@ def route(task: str, config: Config | None = None, to: str = "langchain") -> Rou
             decision = _ask(orchestrator, task, config)
         except Exception as e:
             failed.append(orchestrator)
-            failures.append(f"{orchestrator} : {_error_text(e)}")
+            failures.append(f"{orchestrator}: {_error_text(e)}")
             continue
         candidates = _candidates(config, decision.choices)
         if candidates:
@@ -250,12 +250,12 @@ def route(task: str, config: Config | None = None, to: str = "langchain") -> Rou
         # Choix invalide : traité comme un échec, l'orchestrateur suivant a sa chance.
         invalid_choice = True
         failed.append(orchestrator)
-        failures.append(f"{orchestrator} : choix invalide {decision.choices!r}")
+        failures.append(f"{orchestrator}: invalid choice {decision.choices!r}")
 
     if answered is None:
         # Dernier recours : l'application continue avec un modèle découvert.
         candidates = _last_resort(config)
-        reason = "Aucun orchestrateur n'a répondu : repli sur un modèle découvert."
+        reason = "No orchestrator answered: falling back to a discovered model."
 
     formatted = [_format(spec, to) for spec in candidates]
     providers = [_provider(spec) for spec in candidates]
@@ -280,16 +280,16 @@ def route(task: str, config: Config | None = None, to: str = "langchain") -> Rou
         routing_failed=not result.routed,
         latency_ms=elapsed(),
         mode=mode,
-        error=" ; ".join(failures) or None,
+        error="; ".join(failures) or None,
     )
     if not result.routed:
         logger.warning(
-            f"Aucun orchestrateur n'a répondu ({', '.join(failed)}) : "
-            f"repli sur {candidates[0]}. Détail de l'erreur dans le log."
+            f"No orchestrator answered ({', '.join(failed)}): "
+            f"falling back to {candidates[0]}. Error details in the log."
         )
     elif failed:
         logger.warning(
-            f"Orchestrateur en échec : {', '.join(failed)}. Secours utilisé : {answered}. "
-            "Détail de l'erreur dans le log."
+            f"Orchestrator failed: {', '.join(failed)}. Backup used: {answered}. "
+            "Error details in the log."
         )
     return result

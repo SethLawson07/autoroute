@@ -13,7 +13,7 @@ from autoroute.config import ENV_KEYS, MODES, config_path, ensure_parent, get_mo
 from autoroute.router import route
 from autoroute.ui import DEFAULT_PORT, HOST, log_file, make_server, read_decisions
 
-app = typer.Typer(help="Autoroute : choisit le bon modèle LLM pour une tâche.")
+app = typer.Typer(help="Autoroute: picks the right LLM for a task.")
 
 
 def _short(e: Exception) -> str:
@@ -23,8 +23,8 @@ def _short(e: Exception) -> str:
 
 def _fail(e: Exception) -> NoReturn:
     # Les ValueError portent nos messages destinés à l'utilisateur : le type n'apporte rien.
-    prefix = "Erreur" if isinstance(e, ValueError) else f"Erreur inattendue ({type(e).__name__})"
-    typer.echo(f"{prefix} : {_short(e)}", err=True)
+    prefix = "Error" if isinstance(e, ValueError) else f"Unexpected error ({type(e).__name__})"
+    typer.echo(f"{prefix}: {_short(e)}", err=True)
     raise typer.Exit(1)
 
 
@@ -32,7 +32,7 @@ class _Attention(logging.Handler):
     """Affiche les avertissements d'Autoroute en une ligne, sans nom de logger."""
 
     def emit(self, record: logging.LogRecord) -> None:
-        typer.echo(f"Attention : {record.getMessage()}", err=True)
+        typer.echo(f"Warning: {record.getMessage()}", err=True)
 
 
 @contextmanager
@@ -61,15 +61,15 @@ def _template(name: str) -> str:
 def init(
     orchestrator: str | None = typer.Option(
         None, "--orchestrator", "-o",
-        help="Orchestrateur du mode actif (AUTOROUTE_MODE), au format fournisseur:nom",
+        help="Orchestrator for the active mode (AUTOROUTE_MODE), as provider:name",
     ),
 ):
-    """Crée .env.example et .autoroute/config.yaml (facultatif) s'ils n'existent pas."""
+    """Create .env.example and .autoroute/config.yaml (optional) if they don't exist."""
     with _cli():
         config_yaml = _template("config.yaml")
         if orchestrator:
             if ":" not in orchestrator:
-                raise ValueError(f"« {orchestrator} » : écris l'orchestrateur au format fournisseur:nom")
+                raise ValueError(f"'{orchestrator}': write the orchestrator as provider:name")
             mode = get_mode()
             # Décommente la ligne du mode actif. Remplacement par fonction : la valeur est
             # insérée telle quelle, sans interprétation des « \ ».
@@ -84,68 +84,68 @@ def init(
         }
         for path, content in files_to_create.items():
             if path.exists():
-                typer.echo(f"Déjà présent, non modifié : {path.as_posix()}")
+                typer.echo(f"Already exists, left unchanged: {path.as_posix()}")
             else:
                 ensure_parent(path)
                 path.write_text(content, encoding="utf-8")
-                typer.echo(f"Créé : {path.as_posix()}")
-        typer.echo("Étape suivante : copie .env.example en .env et renseigne tes clés API.")
+                typer.echo(f"Created: {path.as_posix()}")
+        typer.echo("Next step: copy .env.example to .env and fill in your API keys.")
 
 
 @app.command()
 def models():
-    """Liste les modèles disponibles dans le mode actif."""
+    """List the models available in the active mode."""
     with _cli():
         mode = get_mode()
 
         # Affiché avant la découverte : c'est quand elle échoue qu'on en a le plus besoin.
-        typer.echo(f"Mode : {mode}")
-        typer.echo("Clés :")
+        typer.echo(f"Mode: {mode}")
+        typer.echo("Keys:")
         for provider in MODES[mode]:
             typer.echo(f"  {ENV_KEYS[provider]:<18} {key_source(provider)}")
 
         config = discover_config(mode=mode)
 
-        typer.echo(f"Orchestrateur : {config.orchestrator}")
+        typer.echo(f"Orchestrator: {config.orchestrator}")
         if config.backup_orchestrators:
-            typer.echo(f"Orchestrateurs de secours : {', '.join(config.backup_orchestrators)}")
+            typer.echo(f"Backup orchestrators: {', '.join(config.backup_orchestrators)}")
         for m in config.models:
             typer.echo(f"- {m.spec}")
 
 
 @app.command("route")
 def route_cmd(task: str):
-    """Affiche le modèle choisi pour une tâche, et pourquoi."""
+    """Show the model picked for a task, and why."""
     with _cli():
         r = route(task)  # les échecs d'orchestrateur sont affichés en avertissement
-        typer.echo(f"Modèle : {r.model}")
-        typer.echo(f"Replis : {', '.join(r.fallbacks) or 'aucun'}")
-        typer.echo(f"Raison : {r.reason}")
-        typer.echo(f"Routé  : {'oui' if r.routed else 'non (modèle par défaut)'}")
-        typer.echo(f"Id     : {r.id}")
+        typer.echo(f"Model:     {r.model}")
+        typer.echo(f"Fallbacks: {', '.join(r.fallbacks) or 'none'}")
+        typer.echo(f"Reason:    {r.reason}")
+        typer.echo(f"Routed:    {'yes' if r.routed else 'no (default model)'}")
+        typer.echo(f"Id:        {r.id}")
 
 
 @app.command()
 def ui(
     log: str | None = typer.Option(
-        None, "--log", help="Fichier de log à lire (défaut : AUTOROUTE_LOG, sinon .autoroute/log.jsonl ; requis si AUTOROUTE_LOG vaut stdout ou off)",
+        None, "--log", help="Log file to read (default: AUTOROUTE_LOG, else .autoroute/log.jsonl; required if AUTOROUTE_LOG is stdout or off)",
     ),
-    port: int = typer.Option(DEFAULT_PORT, "--port", "-p", help="Port local du serveur"),
+    port: int = typer.Option(DEFAULT_PORT, "--port", "-p", help="Local server port"),
 ):
-    """Ouvre le log dans le navigateur (serveur local, lecture seule)."""
+    """Open the log in your browser (local, read-only server)."""
     with _cli():
         path = log_file(log)
         read_decisions(path, limit=1)  # log absent ou illisible : erreur propre avant de démarrer
         server = make_server(path, port)
         url = f"http://{HOST}:{server.server_address[1]}"
-        typer.echo(f"Log : {path.as_posix()}")
-        typer.echo(f"Interface : {url}  (Ctrl+C pour arrêter)")
-        typer.echo("Accessible depuis cette machine uniquement : le log contient tes prompts.")
+        typer.echo(f"Log: {path.as_posix()}")
+        typer.echo(f"Interface: {url}  (Ctrl+C to stop)")
+        typer.echo("Reachable from this machine only: the log contains your prompts.")
         webbrowser.open(url)
         try:
             server.serve_forever()
         except KeyboardInterrupt:
-            typer.echo("Arrêté.")
+            typer.echo("Stopped.")
         finally:
             server.server_close()
 
