@@ -168,7 +168,7 @@ r.model      # "anthropic:claude-sonnet-5-5"
 r.fallbacks  # ["openai:gpt-5.5", "google_genai:gemini-3.8-pro"]  (0 to 2, without r.model)
 r.provider   # "anthropic": provider of r.model (openai, anthropic, google, mistral)
 r.providers  # ["anthropic", "openai", "google"]: providers of [r.model, *r.fallbacks], in order
-r.reason     # why this model, in the language of the task
+r.reason     # why this model, in the language of the task (in English if r.routed == False)
 r.routed     # True: chosen for your task. False: default model (no orchestrator answered)
 r.id         # ID of the decision in the log
 ```
@@ -318,7 +318,7 @@ The server only listens on your machine (`127.0.0.1`), read-only, and the page l
 - One choice per prompt: no re-routing at each step of an agent.
 - No check of the chosen model's capabilities (tool calling, vision).
 - No cost calculation or savings measurement yet.
-- The orchestrator's reason follows the language of your prompt.
+- The orchestrator's reason follows the language of your prompt, except when no orchestrator answered (`r.routed == False`): no model can write it then, so it is a fixed English text ("No orchestrator answered: falling back to a discovered model.").
 - LangChain is the reference integration: the examples and automatic fallbacks are written for it. With `to="native"`, picking the SDK and handling fallbacks are up to you. LangChain is still installed with Autoroute, which uses it to query the orchestrator.
 
 ## Security

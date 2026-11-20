@@ -109,7 +109,10 @@ def _decision_schema(config: Config) -> dict:
             },
             "reason": {
                 "type": "string",
-                "description": "Pourquoi le premier modèle, en une ou deux phrases, dans la langue de la tâche.",
+                "description": (
+                    "Pourquoi le premier modèle, en une ou deux phrases, dans la langue de la tâche "
+                    "(pas forcément le français)."
+                ),
             },
         },
         "required": ["choices", "reason"],
@@ -130,8 +133,10 @@ def _build_prompt(task: str, config: Config) -> str:
         "Réponds avec les noms exacts, tels qu'ils apparaissent dans la liste, au format "
         f"fournisseur:nom (champ choices) : le meilleur modèle en premier, puis au plus "
         f"{MAX_CANDIDATES - 1} modèle(s) de repli adapté(s) à la tâche, utilisé(s) si le premier échoue. "
-        "Donne la raison du premier choix (champ reason), "
-        "rédigée dans la langue de la tâche (ex. en anglais si la tâche est en anglais)."
+        "Donne la raison du premier choix (champ reason).\n\n"
+        "Langue de la raison : celle de la tâche, pas celle de ces instructions. "
+        "Ces instructions sont en français, mais si la tâche est en anglais, la raison est en anglais ; "
+        "en espagnol, en espagnol ; et ainsi de suite. Rédige en français seulement si la tâche est en français."
     )
 
 
@@ -255,6 +260,8 @@ def route(task: str, config: Config | None = None, to: str = "langchain") -> Rou
     if answered is None:
         # Dernier recours : l'application continue avec un modèle découvert.
         candidates = _last_resort(config)
+        # Texte fixe, en anglais : sans orchestrateur, aucun modèle ne peut le rédiger dans la
+        # langue de la tâche (documenté dans le README, « Limites connues »).
         reason = "No orchestrator answered: falling back to a discovered model."
 
     formatted = [_format(spec, to) for spec in candidates]

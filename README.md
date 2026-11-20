@@ -168,7 +168,7 @@ r.model      # "anthropic:claude-sonnet-5-5"
 r.fallbacks  # ["openai:gpt-5.5", "google_genai:gemini-3.8-pro"]  (0 à 2, sans r.model)
 r.provider   # "anthropic" : fournisseur de r.model (openai, anthropic, google, mistral)
 r.providers  # ["anthropic", "openai", "google"] : fournisseurs de [r.model, *r.fallbacks], dans l'ordre
-r.reason     # pourquoi ce modèle, dans la langue de la tâche
+r.reason     # pourquoi ce modèle, dans la langue de la tâche (en anglais si r.routed == False)
 r.routed     # True : choisi pour ta tâche. False : modèle par défaut (aucun orchestrateur n'a répondu)
 r.id         # identifiant de la décision dans le log
 ```
@@ -318,7 +318,7 @@ Le serveur n'écoute que sur ta machine (`127.0.0.1`), en lecture seule, et la p
 - Un seul choix par prompt : pas de re-routage à chaque étape d'un agent.
 - Aucune vérification des capacités du modèle choisi (appel d'outils, vision).
 - Pas encore de calcul de coût ni de mesure du gain.
-- La CLI, les avertissements et la page de `autoroute ui` sont en anglais. La raison de l'orchestrateur suit la langue de ton prompt.
+- La CLI, les avertissements et la page de `autoroute ui` sont en anglais. La raison de l'orchestrateur suit la langue de ton prompt, sauf quand aucun orchestrateur n'a répondu (`r.routed == False`) : aucun modèle ne peut alors la rédiger, et elle est fixe, en anglais (« No orchestrator answered: falling back to a discovered model. »).
 - LangChain est l'intégration de référence : les exemples et les replis automatiques sont écrits pour lui. Avec `to="native"`, le choix du SDK et les replis sont à ta charge. LangChain reste installé avec Autoroute, qui l'utilise pour interroger l'orchestrateur.
 
 ## Sécurité

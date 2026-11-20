@@ -86,7 +86,10 @@ def test_prompt_contains_models_and_task(config, fake_llm):
 def test_prompt_asks_reason_in_task_language(config, fake_llm):
     fake = fake_llm(Decision(choices=["openai:gpt-4o-mini"], reason="Simple task"))
     route("Say hello", config)
-    assert "langue de la tâche" in fake.prompt
+    assert "celle de la tâche, pas celle de ces instructions" in fake.prompt
+    # La consigne de langue vient après la tâche : c'est la dernière chose que lit l'orchestrateur.
+    assert fake.prompt.index("Say hello") < fake.prompt.index("Langue de la raison")
+    assert "langue de la tâche" in fake.schema["properties"]["reason"]["description"]
 
 
 def test_schema_restricts_choice_to_discovered_models(config, fake_llm):

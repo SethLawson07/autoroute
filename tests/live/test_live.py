@@ -45,13 +45,15 @@ def test_routing_in_single_provider_mode(provider):
     need_key(provider)
     mode = PROVIDER_MODE[provider]
     config = discover_config(mode=mode)
-    r = route("Dis bonjour en une phrase.", config)
+    # Tâche en anglais : la raison doit être en anglais, même si le prompt d'orchestration est en français.
+    r = route("Say hello in one sentence.", config)
     event = last_decision()
     print(
         f"\n{mode} : orchestrateur {event['orchestrator']} -> {r.model} "
         f"({event['latency_ms']} ms, invalid_choice={event['invalid_choice']})"
     )
     assert r.routed, event["error"]
+    assert not set(r.reason) & set("éèêàçù"), f"raison pas en anglais : {r.reason}"
     # Un routage sain tient dans la limite d'un seul orchestrateur : au-delà, la qualification
     # échoue (origine : 246 s avec une clé Gemini gratuite, le 2026-11-07).
     assert event["latency_ms"] < ORCHESTRATOR_TIMEOUT * 1000, f"routage trop lent : {event['latency_ms']} ms"
