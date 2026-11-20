@@ -82,6 +82,21 @@ def test_summary(tmp_path):
     assert dict(s["orchestrators"]) == {"openai:gpt-5-mini": 1, "anthropic:claude-haiku-5-5": 1}
 
 
+@pytest.mark.parametrize("value", ["off", "stdout"])
+def test_ui_without_log_file_fails_cleanly(monkeypatch, value):
+    monkeypatch.setenv("AUTOROUTE_LOG", value)
+    result = runner.invoke(app, ["ui"])
+    assert result.exit_code != 0
+    assert "--log" in result.output
+    assert "Traceback" not in result.output
+
+
+def test_ui_log_option_works_with_log_off(tmp_path, monkeypatch):
+    monkeypatch.setenv("AUTOROUTE_LOG", "off")
+    path = write_log(tmp_path / "prod.jsonl", [decision()])
+    assert ui.log_file(str(path)) == path
+
+
 def test_log_file_defaults_to_autoroute_log(tmp_path, monkeypatch):
     monkeypatch.setenv("AUTOROUTE_LOG", str(tmp_path / "custom.jsonl"))
     assert ui.log_file() == tmp_path / "custom.jsonl"

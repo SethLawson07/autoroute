@@ -156,7 +156,7 @@ They can also be set in `.env`.
 |---|---|---|
 | `AUTOROUTE_MODE` | Routing mode | `all` |
 | `AUTOROUTE_CONFIG` | Path to the config file | `.autoroute/config.yaml` |
-| `AUTOROUTE_LOG` | Path to the log file | `.autoroute/log.jsonl` |
+| `AUTOROUTE_LOG` | Path to the log file, or `stdout` / `off` (see [Observability](#observability)) | `.autoroute/log.jsonl` |
 
 ## Usage with LangChain
 
@@ -260,6 +260,15 @@ The log lets you understand every choice. It stays on your machine.
 Everything is appended to `.autoroute/log.jsonl`, one JSON object per line. The `schema_version` field changes if the log format evolves: useful if you read it with a script.
 
 If the log cannot be written (read-only folder, for example in a container), `route()` still works: the decision is not recorded and a `WARNING` from the `autoroute` logger reports it once. Then pick a writable folder with `AUTOROUTE_LOG`.
+
+In production, `AUTOROUTE_LOG` also accepts two values:
+
+| `AUTOROUTE_LOG=` | Effect |
+|---|---|
+| `stdout` | One JSON line per decision on standard output: your platform (Docker, Kubernetes, Cloud Run…) collects it with your other logs. These lines contain your prompts. |
+| `off` | No decision is recorded. |
+
+In both cases, `autoroute ui` needs a file: `autoroute ui --log file.jsonl`.
 
 On Windows PowerShell 5.1, read it with `Get-Content .autoroute/log.jsonl -Encoding UTF8`, otherwise accents are garbled.
 

@@ -128,7 +128,7 @@ def route_cmd(task: str):
 @app.command()
 def ui(
     log: str | None = typer.Option(
-        None, "--log", help="Fichier de log à lire (défaut : AUTOROUTE_LOG, sinon .autoroute/log.jsonl)",
+        None, "--log", help="Fichier de log à lire (défaut : AUTOROUTE_LOG, sinon .autoroute/log.jsonl ; requis si AUTOROUTE_LOG vaut stdout ou off)",
     ),
     port: int = typer.Option(DEFAULT_PORT, "--port", "-p", help="Port local du serveur"),
 ):

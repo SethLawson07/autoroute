@@ -156,7 +156,7 @@ Elles peuvent aussi être écrites dans `.env`.
 |---|---|---|
 | `AUTOROUTE_MODE` | Mode de routage | `all` |
 | `AUTOROUTE_CONFIG` | Chemin du fichier de config | `.autoroute/config.yaml` |
-| `AUTOROUTE_LOG` | Chemin du fichier de log | `.autoroute/log.jsonl` |
+| `AUTOROUTE_LOG` | Chemin du fichier de log, ou `stdout` / `off` (voir [Observabilité](#observabilité)) | `.autoroute/log.jsonl` |
 
 ## Utilisation avec LangChain
 
@@ -260,6 +260,15 @@ Le log te permet de comprendre chaque choix. Il reste sur ta machine.
 Tout est ajouté à `.autoroute/log.jsonl`, un objet JSON par ligne. Le champ `schema_version` change si le format du log évolue : utile si tu le lis avec un script.
 
 Si le log ne peut pas être écrit (dossier en lecture seule, par exemple dans un conteneur), `route()` fonctionne quand même : la décision n'est pas enregistrée et un `WARNING` du logger `autoroute` le signale une fois. Choisis alors un dossier accessible en écriture avec `AUTOROUTE_LOG`.
+
+En production, `AUTOROUTE_LOG` accepte aussi deux valeurs :
+
+| `AUTOROUTE_LOG=` | Effet |
+|---|---|
+| `stdout` | Une ligne JSON par décision sur la sortie standard : ta plateforme (Docker, Kubernetes, Cloud Run…) la récupère avec tes autres logs. Ces lignes contiennent tes prompts. |
+| `off` | Aucune décision enregistrée. |
+
+Dans ces deux cas, `autoroute ui` a besoin d'un fichier : `autoroute ui --log fichier.jsonl`.
 
 Sous Windows PowerShell 5.1, lis-le avec `Get-Content .autoroute/log.jsonl -Encoding UTF8`, sinon les accents s'affichent mal.
 

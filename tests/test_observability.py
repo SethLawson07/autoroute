@@ -1,4 +1,7 @@
+import json
 from pathlib import Path
+
+import pytest
 
 from autoroute import observability
 from autoroute.observability import log_decision
@@ -25,6 +28,36 @@ def test_default_log_goes_to_autoroute_dir_with_gitignore(monkeypatch):
     assert Path(".autoroute/log.jsonl").exists()
     gitignore = Path(".autoroute/.gitignore").read_text(encoding="utf-8")
     assert "*.jsonl" in gitignore.splitlines()
+
+
+@pytest.mark.parametrize("value", ["stdout", " STDOUT "])
+def test_log_to_stdout(monkeypatch, capsys, value):
+    monkeypatch.setenv("AUTOROUTE_LOG", value)
+    log_once()
+    event = json.loads(capsys.readouterr().out)
+    assert event["event"] == "decision"
+    assert event["task"] == "tâche"
+    assert not Path(value.strip()).exists()  # pas de fichier nommé « stdout »
+    assert not observability.LOG_PATH.exists()
+
+
+@pytest.mark.parametrize("value", ["off", "OFF"])
+def test_log_off_writes_nothing(monkeypatch, capsys, caplog, value):
+    monkeypatch.setenv("AUTOROUTE_LOG", value)
+    log_once()
+    assert capsys.readouterr().out == ""
+    assert not Path(value).exists()
+    assert not observability.LOG_PATH.exists()
+    assert not caplog.records  # off est un choix, pas un incident : aucun WARNING
+
+
+def test_route_with_log_off(monkeypatch, config, fake_llm):
+    from autoroute import route
+    from autoroute.router import Decision
+
+    monkeypatch.setenv("AUTOROUTE_LOG", "off")
+    fake_llm(Decision(choices=["openai:gpt-4o-mini"], reason="Simple"))
+    assert route("Dis bonjour", config).routed is True
 
 
 def unwritable_log(monkeypatch, tmp_path) -> Path:

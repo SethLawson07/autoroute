@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -15,22 +16,50 @@ logger = logging.getLogger(__name__)
 _unwritable: set[str] = set()
 
 
-def _log_path() -> Path:
+# Valeurs spéciales de AUTOROUTE_LOG (sinon : un chemin de fichier).
+STDOUT = "stdout"  # une ligne JSON par décision sur la sortie standard (logs du conteneur)
+OFF = "off"        # aucune écriture
+
+
+def _log_target() -> Path | str:
+    """Où écrire les décisions : un fichier (Path), STDOUT ou OFF."""
     load_env()
-    return Path(os.getenv("AUTOROUTE_LOG") or LOG_PATH)
+    value = (os.getenv("AUTOROUTE_LOG") or "").strip()
+    if value.lower() in (STDOUT, OFF):
+        return value.lower()
+    return Path(value or LOG_PATH)
+
+
+def _log_path() -> Path:
+    """Le fichier de log. Lève ValueError si AUTOROUTE_LOG vaut stdout ou off (pas de fichier)."""
+    target = _log_target()
+    if isinstance(target, str):
+        raise ValueError(f"AUTOROUTE_LOG={target} : aucun fichier de log. Indique un fichier avec --log.")
+    return target
 
 
 def _write(event: dict) -> None:
+    target = _log_target()
+    if target == OFF:
+        return
     event = {
         "schema_version": SCHEMA_VERSION,
         "timestamp": datetime.now(timezone.utc).isoformat(),
         **event,
     }
-    path = _log_path()
+    line = json.dumps(event, ensure_ascii=False) + "\n"
+    if target == STDOUT:
+        try:
+            sys.stdout.write(line)
+            sys.stdout.flush()  # visible tout de suite dans les logs du conteneur
+        except (OSError, ValueError, UnicodeEncodeError):
+            pass  # sortie fermée ou mal encodée : principe 8, on n'interrompt pas route()
+        return
+    path = target
     try:
         ensure_parent(path)
         with path.open("a", encoding="utf-8") as f:
-            f.write(json.dumps(event, ensure_ascii=False) + "\n")
+            f.write(line)
     except OSError as e:
         # Principe 8 : un log impossible à écrire (conteneur en lecture seule, droits)
         # ne doit pas faire planter route(). La décision est perdue, pas l'application.
