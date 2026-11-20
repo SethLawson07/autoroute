@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -76,8 +76,8 @@
   <span class="path" id="path"></span>
   <span class="spacer"></span>
   <span class="muted" id="counts"></span>
-  <label class="inline"><input type="checkbox" id="auto"> Actualiser toutes les 5 s</label>
-  <button id="refresh" type="button">Actualiser</button>
+  <label class="inline"><input type="checkbox" id="auto"> Refresh every 5 s</label>
+  <button id="refresh" type="button">Refresh</button>
 </div></header>
 
 <main>
@@ -86,21 +86,21 @@
   <section class="cards" id="cards"></section>
 
   <section class="dists">
-    <div class="card dist"><h2>Modèles choisis</h2><div id="models"></div></div>
-    <div class="card dist"><h2>Orchestrateurs</h2><div id="orchestrators"></div></div>
+    <div class="card dist"><h2>Chosen models</h2><div id="models"></div></div>
+    <div class="card dist"><h2>Orchestrators</h2><div id="orchestrators"></div></div>
   </section>
 
   <section class="filters">
-    <input type="search" id="q" placeholder="Rechercher dans la tâche, la raison, le modèle…">
-    <select id="f-mode"><option value="">Tous les modes</option></select>
-    <select id="f-model"><option value="">Tous les modèles</option></select>
+    <input type="search" id="q" placeholder="Search task, reason, model…">
+    <select id="f-mode"><option value="">All modes</option></select>
+    <select id="f-model"><option value="">All models</option></select>
     <select id="f-status">
-      <option value="">Tous les statuts</option>
+      <option value="">All statuses</option>
       <option value="ok">OK</option>
-      <option value="backup">Secours utilisé</option>
-      <option value="fallback">Non routé (repli)</option>
-      <option value="error">Erreur (aucun modèle)</option>
-      <option value="problems">Tous les incidents</option>
+      <option value="backup">Backup used</option>
+      <option value="fallback">Not routed (fallback)</option>
+      <option value="error">Error (no model)</option>
+      <option value="problems">All incidents</option>
     </select>
     <span class="muted" id="shown"></span>
   </section>
@@ -109,7 +109,7 @@
     <div class="table-wrap">
       <table>
         <thead><tr>
-          <th>Date</th><th>Tâche</th><th>Modèle choisi</th><th>Orchestrateur</th><th>Mode</th><th class="num">Latence</th><th>Statut</th>
+          <th>Date</th><th>Task</th><th>Chosen model</th><th>Orchestrator</th><th>Mode</th><th class="num">Latency</th><th>Status</th>
         </tr></thead>
         <tbody id="rows"></tbody>
       </table>
@@ -122,9 +122,9 @@
 "use strict";
 const STATUS = {
   ok: "OK",
-  backup: "Secours utilisé",
-  fallback: "Non routé",
-  error: "Erreur",
+  backup: "Backup used",
+  fallback: "Not routed",
+  error: "Error",
 };
 const $ = (id) => document.getElementById(id);
 let data = null;
@@ -156,11 +156,11 @@ function badge(status) {
 
 function renderCards(s) {
   const cards = [
-    ["Décisions affichées", s.count],
-    ["Non routées", s.routing_failed_pct + " %"],
-    ["Choix invalides", s.invalid_choice_pct + " %"],
-    ["Erreurs (aucun modèle)", s.error_pct + " %"],
-    ["Latence moyenne du routage", fmtMs(s.mean_latency_ms)],
+    ["Decisions shown", s.count],
+    ["Not routed", s.routing_failed_pct + " %"],
+    ["Invalid choices", s.invalid_choice_pct + " %"],
+    ["Errors (no model)", s.error_pct + " %"],
+    ["Mean routing latency", fmtMs(s.mean_latency_ms)],
   ];
   $("cards").replaceChildren(...cards.map(([label, value]) =>
     el("div", { class: "card" }, [el("div", { class: "label", text: label }), el("div", { class: "value", text: String(value) })])
@@ -169,7 +169,7 @@ function renderCards(s) {
 
 function renderDist(target, pairs) {
   const box = $(target);
-  if (!pairs.length) { box.replaceChildren(el("div", { class: "muted", text: "Aucune donnée" })); return; }
+  if (!pairs.length) { box.replaceChildren(el("div", { class: "muted", text: "No data" })); return; }
   const max = pairs[0][1];
   box.replaceChildren(...pairs.slice(0, 12).map(([name, n]) => {
     const fill = el("span", { class: "fill" });
@@ -226,24 +226,24 @@ function renderRows() {
 function renderDetail(d) {
   const box = $("detail");
   if (!d) { box.hidden = true; $("layout").classList.remove("with-detail"); return; }
-  const close = el("button", { type: "button", text: "Fermer" });
+  const close = el("button", { type: "button", text: "Close" });
   close.addEventListener("click", () => { selectedId = null; renderRows(); renderDetail(null); });
   const rows = [
     ["Date", fmtDate(d.timestamp)],
-    ["Statut", badge(d.status)],
-    ["Tâche", el("pre", { text: d.task || "" })],
-    ["Modèle choisi", d.model || "–"],
-    ["Candidats", (d.candidates || []).length ? el("ol", {}, d.candidates.map((c) => el("li", { text: c }))) : "–"],
-    ["Raison", d.reason || "–"],
-    ["Orchestrateur", d.orchestrator || "–"],
+    ["Status", badge(d.status)],
+    ["Task", el("pre", { text: d.task || "" })],
+    ["Chosen model", d.model || "–"],
+    ["Candidates", (d.candidates || []).length ? el("ol", {}, d.candidates.map((c) => el("li", { text: c }))) : "–"],
+    ["Reason", d.reason || "–"],
+    ["Orchestrator", d.orchestrator || "–"],
     ["Mode", d.mode || ""],
-    ["Latence", fmtMs(d.latency_ms)],
-    ["Choix invalide", d.invalid_choice ? "oui" : "non"],
-    ["Erreurs", d.error ? el("pre", { text: d.error }) : "aucune"],
+    ["Latency", fmtMs(d.latency_ms)],
+    ["Invalid choice", d.invalid_choice ? "yes" : "no"],
+    ["Errors", d.error ? el("pre", { text: d.error }) : "none"],
     ["decision_id", el("code", { text: d.decision_id || "" })],
   ];
   box.replaceChildren(
-    el("div", { class: "head" }, [el("h2", { text: "Détail de la décision" }), close]),
+    el("div", { class: "head" }, [el("h2", { text: "Decision details" }), close]),
     el("dl", {}, rows.flatMap(([k, v]) => [el("dt", { text: k }), el("dd", {}, typeof v === "string" ? document.createTextNode(v) : v)])),
   );
   box.hidden = false;
@@ -259,19 +259,19 @@ function render() {
     data.decisions = [];
     data.summary = { count: 0, routing_failed_pct: 0, invalid_choice_pct: 0, error_pct: 0, mean_latency_ms: null, models: [], orchestrators: [] };
   } else if (data.skipped) {
-    err.textContent = data.skipped + " ligne(s) illisible(s) ignorée(s) dans le log.";
+    err.textContent = data.skipped + " unreadable line(s) skipped in the log.";
     err.hidden = false;
   } else {
     err.hidden = true;
   }
   $("counts").textContent = data.error ? "" :
-    (data.total > data.shown ? data.shown + " dernières décisions sur " + data.total : data.total + " décision(s)");
+    (data.total > data.shown ? "last " + data.shown + " of " + data.total + " decisions" : data.total + " decision(s)");
   renderCards(data.summary);
   renderDist("models", data.summary.models);
   renderDist("orchestrators", data.summary.orchestrators);
   const uniq = (k) => [...new Set(data.decisions.map((d) => d[k]).filter(Boolean))].sort();
-  fillSelect("f-mode", uniq("mode"), "Tous les modes");
-  fillSelect("f-model", uniq("model"), "Tous les modèles");
+  fillSelect("f-mode", uniq("mode"), "All modes");
+  fillSelect("f-model", uniq("model"), "All models");
   renderRows();
   renderDetail(data.decisions.find((d) => d.decision_id && d.decision_id === selectedId) || null);
 }
@@ -282,7 +282,7 @@ async function load() {
     if (!res.ok) throw new Error("HTTP " + res.status);
     data = await res.json();
   } catch (e) {
-    data = { error: "Impossible de lire le log : le serveur « autoroute ui » est-il toujours lancé ? (" + e.message + ")" };
+    data = { error: "Cannot read the log: is the 'autoroute ui' server still running? (" + e.message + ")" };
   }
   render();
 }

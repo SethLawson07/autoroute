@@ -280,7 +280,7 @@ autoroute ui --log prod.jsonl    # another file, for example a log copied from y
 autoroute ui --port 9000         # another port
 ```
 
-The page shows a summary (rate of unrouted decisions and invalid choices, mean latency, most chosen models and orchestrators), a table of the last 1,000 decisions with search and filters, and the details of each decision (task, reason, candidates, errors). The "Actualiser" (refresh) button rereads the log without restarting the command. `Ctrl+C` stops the server. The page labels are in French for now.
+The page shows a summary (rate of unrouted decisions and invalid choices, mean latency, most chosen models and orchestrators), a table of the last 1,000 decisions with search and filters, and the details of each decision (task, reason, candidates, errors). The "Refresh" button rereads the log without restarting the command. `Ctrl+C` stops the server.
 
 The server only listens on your machine (`127.0.0.1`), read-only, and the page loads no external resources. Never expose it on a network: the log contains your prompts. For a remote server, copy the file and run `autoroute ui --log` locally, or use an SSH tunnel (`ssh -L 8765:127.0.0.1:8765 server`).
 
@@ -318,7 +318,7 @@ The server only listens on your machine (`127.0.0.1`), read-only, and the page l
 - One choice per prompt: no re-routing at each step of an agent.
 - No check of the chosen model's capabilities (tool calling, vision).
 - No cost calculation or savings measurement yet.
-- The orchestrator's reason follows the language of your prompt. The `autoroute ui` page is still in French.
+- The orchestrator's reason follows the language of your prompt.
 - LangChain is the reference integration: the examples and automatic fallbacks are written for it. With `to="native"`, picking the SDK and handling fallbacks are up to you. LangChain is still installed with Autoroute, which uses it to query the orchestrator.
 
 ## Security

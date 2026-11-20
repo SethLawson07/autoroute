@@ -280,7 +280,7 @@ autoroute ui --log prod.jsonl    # un autre fichier, par exemple un log copié d
 autoroute ui --port 9000         # un autre port
 ```
 
-La page affiche un résumé (taux de routages non routés et de choix invalides, latence moyenne, modèles et orchestrateurs les plus choisis), le tableau des 1 000 dernières décisions avec recherche et filtres, et le détail de chaque décision (tâche, raison, candidats, erreurs). Le bouton « Actualiser » relit le log sans relancer la commande. `Ctrl+C` arrête le serveur.
+La page affiche un résumé (taux de routages non routés et de choix invalides, latence moyenne, modèles et orchestrateurs les plus choisis), le tableau des 1 000 dernières décisions avec recherche et filtres, et le détail de chaque décision (tâche, raison, candidats, erreurs). Le bouton « Refresh » relit le log sans relancer la commande. `Ctrl+C` arrête le serveur.
 
 Le serveur n'écoute que sur ta machine (`127.0.0.1`), en lecture seule, et la page ne charge aucune ressource externe. Ne l'expose jamais sur un réseau : le log contient tes prompts. Pour un serveur distant, récupère le fichier et lance `autoroute ui --log` en local, ou passe par un tunnel SSH (`ssh -L 8765:127.0.0.1:8765 serveur`).
 
@@ -318,7 +318,7 @@ Le serveur n'écoute que sur ta machine (`127.0.0.1`), en lecture seule, et la p
 - Un seul choix par prompt : pas de re-routage à chaque étape d'un agent.
 - Aucune vérification des capacités du modèle choisi (appel d'outils, vision).
 - Pas encore de calcul de coût ni de mesure du gain.
-- Les messages de la CLI et les avertissements sont en anglais. La raison de l'orchestrateur suit la langue de ton prompt. La page de `autoroute ui` est encore en français.
+- La CLI, les avertissements et la page de `autoroute ui` sont en anglais. La raison de l'orchestrateur suit la langue de ton prompt.
 - LangChain est l'intégration de référence : les exemples et les replis automatiques sont écrits pour lui. Avec `to="native"`, le choix du SDK et les replis sont à ta charge. LangChain reste installé avec Autoroute, qui l'utilise pour interroger l'orchestrateur.
 
 ## Sécurité

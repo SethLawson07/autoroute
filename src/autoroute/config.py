@@ -14,7 +14,7 @@ AUTOROUTE_DIR = Path(".autoroute")
 DEFAULT_CONFIG = AUTOROUTE_DIR / "config.yaml"
 
 # Écrit dans .autoroute/ : le log (texte des tâches) ne doit jamais partir dans git.
-_DIR_GITIGNORE = "# Créé par Autoroute : le log contient le texte de tes tâches.\n*.jsonl\n"
+_DIR_GITIGNORE = "# Created by Autoroute: the log contains the text of your tasks.\n*.jsonl\n"
 
 ENV_KEYS = {
     "openai": "OPENAI_API_KEY",
