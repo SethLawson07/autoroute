@@ -14,6 +14,7 @@ def isolated(tmp_path, monkeypatch):
         monkeypatch.delenv(var, raising=False)
     # Le cache de la découverte ne doit pas passer d'un test à l'autre.
     monkeypatch.setattr("autoroute.router._discovery_cache", {})
+    monkeypatch.setattr("autoroute.observability._unwritable", set())
 
 
 @pytest.fixture

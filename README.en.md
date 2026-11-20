@@ -259,6 +259,8 @@ The log lets you understand every choice. It stays on your machine.
 
 Everything is appended to `.autoroute/log.jsonl`, one JSON object per line. The `schema_version` field changes if the log format evolves: useful if you read it with a script.
 
+If the log cannot be written (read-only folder, for example in a container), `route()` still works: the decision is not recorded and a `WARNING` from the `autoroute` logger reports it once. Then pick a writable folder with `AUTOROUTE_LOG`.
+
 On Windows PowerShell 5.1, read it with `Get-Content .autoroute/log.jsonl -Encoding UTF8`, otherwise accents are garbled.
 
 ### `autoroute ui`: the log in your browser
