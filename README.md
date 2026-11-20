@@ -28,7 +28,7 @@ Autoroute n'appelle **pas** le modèle : il te renvoie un objet dont `r.model` e
 
 ![Comment fonctionne Autoroute](assets/how-it-works.fr.svg)
 
-1. **Découverte** : Autoroute interroge l'API de liste des modèles de chaque fournisseur dont la clé est renseignée, et garde les modèles de chat. Il n'y a aucune liste de modèles à maintenir.
+1. **Découverte** : Autoroute interroge l'API de liste des modèles de chaque fournisseur dont la clé est renseignée, et garde les modèles de chat. Il n'y a aucune liste de modèles à maintenir. La liste est gardée en mémoire 5 minutes : les appels suivants à `route()` ne la redemandent pas.
 2. **Routage** : un **orchestrateur**, modèle léger choisi automatiquement parmi tes modèles pour que le routage reste rapide et peu coûteux (ou celui que tu choisis dans `.autoroute/config.yaml`), reçoit ton prompt et cette liste. Il renvoie le modèle le plus adapté, jusqu'à 2 replis, et la raison de son choix. Sa réponse est limitée aux modèles découverts.
 3. **Log** : chaque décision est écrite dans un log JSONL.
 
@@ -303,7 +303,6 @@ Le serveur n'écoute que sur ta machine (`127.0.0.1`), en lecture seule, et la p
 - Le routage ajoute un appel payant et quelques secondes (environ 1 à 7 s selon l'orchestrateur, dans nos essais).
 - Pas encore de limite de temps sur l'orchestrateur : avec une clé gratuite à quota limité, le routage peut prendre plusieurs minutes.
 - Les modèles découverts sont gardés en mémoire 5 minutes : un nouveau modèle d'un fournisseur peut mettre jusqu'à 5 minutes à apparaître. Un changement de clé API, de `AUTOROUTE_MODE` ou de `.autoroute/config.yaml` est pris en compte tout de suite.
-
 - Un fournisseur peut lister un modèle que ta clé ne peut pas appeler : s'il est choisi, les replis prennent le relais.
 - Un seul choix par prompt : pas de re-routage à chaque étape d'un agent.
 - Aucune vérification des capacités du modèle choisi (appel d'outils, vision).

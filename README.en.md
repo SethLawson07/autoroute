@@ -28,7 +28,7 @@ Autoroute does **not** call the model: it returns an object whose `r.model` is t
 
 ![How Autoroute works](https://raw.githubusercontent.com/SethLawson07/autoroute/main/assets/how-it-works.en.svg)
 
-1. **Discovery**: Autoroute queries the model-listing API of every provider whose key is set, and keeps the chat models. There is no model list to maintain.
+1. **Discovery**: Autoroute queries the model-listing API of every provider whose key is set, and keeps the chat models. There is no model list to maintain. The list is kept in memory for 5 minutes: later `route()` calls don't fetch it again.
 2. **Routing**: an **orchestrator**, a lightweight model picked automatically among your models to keep routing fast and cheap (or the one you choose in `.autoroute/config.yaml`), receives your prompt and that list. It returns the most suitable model, up to 2 fallbacks, and the reason for its choice. Its answer is restricted to the discovered models.
 3. **Logging**: every decision is written to a JSONL log.
 
@@ -303,7 +303,6 @@ The server only listens on your machine (`127.0.0.1`), read-only, and the page l
 - Routing adds one paid call and a few seconds (about 1 to 7 s depending on the orchestrator, in our tests).
 - No time limit on the orchestrator yet: with a free, rate-limited key, routing can take several minutes.
 - Discovered models are kept in memory for 5 minutes: a provider's new model can take up to 5 minutes to show up. A change of API key, `AUTOROUTE_MODE` or `.autoroute/config.yaml` takes effect immediately.
-
 - A provider may list a model your key cannot call: if it is chosen, the fallbacks take over.
 - One choice per prompt: no re-routing at each step of an agent.
 - No check of the chosen model's capabilities (tool calling, vision).
