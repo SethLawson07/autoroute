@@ -118,7 +118,7 @@ The orchestrator is the model that does the routing. You don't pick it, and no m
 
 `autoroute models` shows the chosen orchestrator and the backups.
 
-**Routing never crashes your application.** If no orchestrator answers (outage, quota), Autoroute still returns a discovered model (other than the failed orchestrators, when possible), with `r.routed == False`, and logs the error. It only raises when it has no model to offer (no valid key). An orchestrator that names a model that doesn't exist counts as a failure: the next orchestrator takes over. Every orchestrator failure, even one caught by a backup orchestrator, is reported as a `WARNING` on the standard `autoroute` logger (`logging` module): printed to stderr by default, it reaches your application's monitoring if you configure `logging`.
+**Routing never crashes your application.** If no orchestrator answers (outage, quota, more than 20 s), Autoroute still returns a discovered model (other than the failed orchestrators, when possible), with `r.routed == False`, and logs the error. It only raises when it has no model to offer (no valid key). An orchestrator that names a model that doesn't exist counts as a failure: the next orchestrator takes over. Every orchestrator failure, even one caught by a backup orchestrator, is reported as a `WARNING` on the standard `autoroute` logger (`logging` module): printed to stderr by default, it reaches your application's monitoring if you configure `logging`.
 
 ### `.autoroute/config.yaml` (optional): choosing your orchestrator
 
@@ -312,7 +312,7 @@ The server only listens on your machine (`127.0.0.1`), read-only, and the page l
 - The orchestrator only sees model **names**, not their capabilities or prices: it can misjudge a model it doesn't know.
 - Routing is not deterministic: the same prompt can get different (reasonable) choices.
 - Routing adds one paid call and a few seconds (about 1 to 7 s depending on the orchestrator, in our tests).
-- No time limit on the orchestrator yet: with a free, rate-limited key, routing can take several minutes.
+- Each orchestrator has 20 s to answer, with at most one retry: beyond that, the backup orchestrator takes over. In the worst case (all 3 orchestrators too slow), routing can therefore take about 2 minutes before falling back to a discovered model.
 - Discovered models are kept in memory for 5 minutes: a provider's new model can take up to 5 minutes to show up. A change of API key, `AUTOROUTE_MODE` or `.autoroute/config.yaml` takes effect immediately.
 - A provider may list a model your key cannot call: if it is chosen, the fallbacks take over.
 - One choice per prompt: no re-routing at each step of an agent.

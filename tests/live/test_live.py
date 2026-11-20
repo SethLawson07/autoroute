@@ -9,6 +9,7 @@ import pytest
 from autoroute import observability, route
 from autoroute.catalog import discover_config, list_chat_models
 from autoroute.config import ENV_KEYS, MODES, get_api_key
+from autoroute.router import ORCHESTRATOR_TIMEOUT
 
 pytestmark = pytest.mark.live
 
@@ -51,6 +52,9 @@ def test_routing_in_single_provider_mode(provider):
         f"({event['latency_ms']} ms, invalid_choice={event['invalid_choice']})"
     )
     assert r.routed, event["error"]
+    # Un routage sain tient dans la limite d'un seul orchestrateur : au-delà, la qualification
+    # échoue (origine : 246 s avec une clé Gemini gratuite, le 2026-11-07).
+    assert event["latency_ms"] < ORCHESTRATOR_TIMEOUT * 1000, f"routage trop lent : {event['latency_ms']} ms"
     # Le mode est respecté : aucun modèle d'un autre fournisseur (souveraineté).
     assert all(c.startswith(f"{provider}:") for c in [r.model, *r.fallbacks])
 

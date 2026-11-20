@@ -2,11 +2,14 @@ import json
 import logging
 import warnings
 
+import httpx
 import pytest
 
 from autoroute import observability
 from autoroute.config import ModelConfig
-from autoroute.router import MAX_CANDIDATES, Decision, Route, route
+from autoroute.router import (
+    MAX_CANDIDATES, ORCHESTRATOR_RETRIES, ORCHESTRATOR_TIMEOUT, Decision, Route, route,
+)
 
 
 def read_log():
@@ -231,6 +234,53 @@ def test_backup_orchestrator_used_when_first_fails(config, fake_orchestrators, c
     assert event["orchestrator"] == "anthropic:claude-sonnet-4-6"
     assert "quota" in event["error"]
     assert any("Secours utilisé : anthropic:claude-sonnet-4-6" in w for w in warnings_of(caplog))
+
+
+# --- limite de temps de l'orchestrateur ---
+
+def test_orchestrator_gets_timeout_and_retry_limit(config, fake_llm, monkeypatch):
+    seen = {}
+    fake = fake_llm(Decision(choices=["openai:gpt-4o-mini"], reason="Simple"))
+
+    def init(spec, **kw):
+        seen.update(kw)
+        return fake
+
+    monkeypatch.setattr("autoroute.router.init_chat_model", init)
+    route("Dis bonjour", config)
+    assert seen == {"timeout": ORCHESTRATOR_TIMEOUT, "max_retries": ORCHESTRATOR_RETRIES}
+    assert ORCHESTRATOR_TIMEOUT <= 20 and ORCHESTRATOR_RETRIES <= 1
+
+
+class TimedOutLLM:
+    """Orchestrateur qui dépasse la limite de temps : l'appel lève une erreur de timeout."""
+
+    def with_structured_output(self, schema, **kwargs):
+        return self
+
+    def invoke(self, prompt):
+        raise httpx.ReadTimeout("The read operation timed out")
+
+
+def test_timed_out_orchestrator_hands_over_to_backup(config, fake_llm, monkeypatch):
+    config.backup_orchestrators = ["anthropic:claude-sonnet-4-6"]
+    backup = fake_llm(Decision(choices=["openai:gpt-4o-mini"], reason="Simple"))
+    monkeypatch.setattr(
+        "autoroute.router.init_chat_model",
+        lambda spec, **kw: TimedOutLLM() if spec == "openai:gpt-4o-mini" else backup,
+    )
+    r = route("Dis bonjour", config)
+    assert r.routed is True
+    event = read_log()[0]
+    assert event["orchestrator"] == "anthropic:claude-sonnet-4-6"
+    assert "ReadTimeout" in event["error"]
+
+
+def test_all_orchestrators_timed_out_is_last_resort(config, monkeypatch):
+    monkeypatch.setattr("autoroute.router.init_chat_model", lambda spec, **kw: TimedOutLLM())
+    r = route("Dis bonjour", config)
+    assert r.routed is False
+    assert "ReadTimeout" in read_log()[0]["error"]
 
 
 # --- découverte et log ---

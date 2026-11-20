@@ -13,6 +13,13 @@ from autoroute.observability import log_decision
 
 MAX_CANDIDATES = 3  # le choix principal + 2 replis au plus
 
+# Limite de temps par orchestrateur (principe 8 : ne jamais bloquer l'application).
+# Sans elle, les SDK attendent jusqu'à 10 min par requête, et Gemini relance 6 fois
+# après une erreur 429 (246 s mesurées avec une clé gratuite). Au-delà, on passe à
+# l'orchestrateur de secours, puis au dernier recours.
+ORCHESTRATOR_TIMEOUT = 20  # secondes par requête
+ORCHESTRATOR_RETRIES = 1   # relance au plus
+
 # Durée de vie du cache de la découverte (route() sans config) : évite de rappeler l'API
 # de liste de chaque fournisseur à chaque routage.
 DISCOVERY_TTL = 300  # secondes
@@ -140,7 +147,9 @@ def _candidates(config: Config, choices: list[str]) -> list[str]:
 
 def _ask(orchestrator: str, task: str, config: Config) -> Decision:
     # strict=True : l'enum est garanti chez OpenAI, simple indication ailleurs.
-    llm = init_chat_model(orchestrator).with_structured_output(
+    llm = init_chat_model(
+        orchestrator, timeout=ORCHESTRATOR_TIMEOUT, max_retries=ORCHESTRATOR_RETRIES
+    ).with_structured_output(
         _decision_schema(config), strict=True
     )
     return Decision.model_validate(llm.invoke(_build_prompt(task, config)))

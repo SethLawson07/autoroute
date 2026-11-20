@@ -118,7 +118,7 @@ L'orchestrateur est le modèle qui fait le routage. Tu n'as pas à le choisir, e
 
 `autoroute models` affiche l'orchestrateur retenu et ceux de secours.
 
-**Le routage ne fait pas planter ton application.** Si aucun orchestrateur ne répond (panne, quota), Autoroute renvoie quand même un modèle découvert (autre que les orchestrateurs en échec, quand c'est possible), avec `r.routed == False`, et note l'erreur dans le log. Il ne lève une exception que s'il n'a aucun modèle à proposer (aucune clé valide). Un orchestrateur qui cite un modèle inexistant compte comme un échec : l'orchestrateur suivant prend le relais. Chaque échec d'orchestrateur, même rattrapé par un orchestrateur de secours, est signalé par un message `WARNING` du logger standard `autoroute` (module `logging`) : affiché par défaut sur la sortie d'erreur, il rejoint la supervision de ton application si tu configures `logging`.
+**Le routage ne fait pas planter ton application.** Si aucun orchestrateur ne répond (panne, quota, plus de 20 s), Autoroute renvoie quand même un modèle découvert (autre que les orchestrateurs en échec, quand c'est possible), avec `r.routed == False`, et note l'erreur dans le log. Il ne lève une exception que s'il n'a aucun modèle à proposer (aucune clé valide). Un orchestrateur qui cite un modèle inexistant compte comme un échec : l'orchestrateur suivant prend le relais. Chaque échec d'orchestrateur, même rattrapé par un orchestrateur de secours, est signalé par un message `WARNING` du logger standard `autoroute` (module `logging`) : affiché par défaut sur la sortie d'erreur, il rejoint la supervision de ton application si tu configures `logging`.
 
 ### `.autoroute/config.yaml` (facultatif) : choisir ton orchestrateur
 
@@ -312,7 +312,7 @@ Le serveur n'écoute que sur ta machine (`127.0.0.1`), en lecture seule, et la p
 - L'orchestrateur ne voit que les **noms** des modèles, pas leurs capacités ni leurs prix : il peut mal juger un modèle qu'il ne connaît pas.
 - Le routage n'est pas déterministe : le même prompt peut recevoir des choix différents, mais raisonnables.
 - Le routage ajoute un appel payant et quelques secondes (environ 1 à 7 s selon l'orchestrateur, dans nos essais).
-- Pas encore de limite de temps sur l'orchestrateur : avec une clé gratuite à quota limité, le routage peut prendre plusieurs minutes.
+- Chaque orchestrateur a 20 s pour répondre, avec une relance au plus : au-delà, l'orchestrateur de secours prend le relais. Dans le pire cas (les 3 orchestrateurs trop lents), le routage peut donc prendre environ 2 minutes avant le repli sur un modèle découvert.
 - Les modèles découverts sont gardés en mémoire 5 minutes : un nouveau modèle d'un fournisseur peut mettre jusqu'à 5 minutes à apparaître. Un changement de clé API, de `AUTOROUTE_MODE` ou de `.autoroute/config.yaml` est pris en compte tout de suite.
 - Un fournisseur peut lister un modèle que ta clé ne peut pas appeler : s'il est choisi, les replis prennent le relais.
 - Un seul choix par prompt : pas de re-routage à chaque étape d'un agent.
