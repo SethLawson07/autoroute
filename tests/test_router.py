@@ -8,7 +8,8 @@ import pytest
 from autoroute import observability
 from autoroute.config import ModelConfig
 from autoroute.router import (
-    MAX_CANDIDATES, ORCHESTRATOR_RETRIES, ORCHESTRATOR_TIMEOUT, Decision, Route, route,
+    MAX_CANDIDATES, ORCHESTRATOR_RETRIES, ORCHESTRATOR_TIMEOUT, Decision, Route,
+    _build_prompt, _decision_schema, route,
 )
 
 
@@ -26,6 +27,17 @@ def config3(config):
     config.models.append(ModelConfig(name="claude-haiku-5-5", provider="anthropic"))
     config.models.append(ModelConfig(name="gpt-5-5", provider="openai"))
     return config
+
+
+# --- le prompt de l'orchestrateur ---
+
+def test_prompt_asks_for_sufficient_model_not_best(config3):
+    # « meilleur » tire l'orchestrateur vers les gros modèles : on demande le modèle suffisant.
+    schema = json.dumps(_decision_schema(config3), ensure_ascii=False)
+    prompt = _build_prompt("Traduis « bonjour » en anglais", config3)
+    for text in (prompt, schema):
+        assert "meilleur" not in text.lower()
+        assert "suffisant" in text.lower()
 
 
 # --- l'objet Route ---

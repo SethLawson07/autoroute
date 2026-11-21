@@ -4,7 +4,7 @@ from autoroute import route
 
 task = "Écris une fonction Python qui parse un CSV"
 
-# The best model, then up to 2 fallbacks chosen by the orchestrator.
+# The chosen model, then up to 2 fallbacks chosen by the orchestrator.
 r = route(task)
 print(f"Modèle choisi : {r.model}  (replis : {r.fallbacks})")
 

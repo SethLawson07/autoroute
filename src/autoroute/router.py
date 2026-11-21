@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 
 class Decision(BaseModel):
-    choices: list[str]  # modèles au format provider:nom, le meilleur en premier
+    choices: list[str]  # modèles au format provider:nom, le modèle choisi en premier
     reason: str         # pourquoi le premier choix, en une ou deux phrases
 
 
@@ -66,7 +66,7 @@ class Route(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
-    model: str                                           # meilleur modèle, au format demandé (to=)
+    model: str                                           # modèle choisi, au format demandé (to=)
     fallbacks: list[str] = Field(default_factory=list)   # 0 à 2 replis, même format, sans model
     provider: str = ""                                   # fournisseur de model : openai, anthropic, google, mistral
     providers: list[str] = Field(default_factory=list)   # fournisseurs de [model, *fallbacks], même ordre
@@ -96,7 +96,7 @@ def _decision_schema(config: Config) -> dict:
     """
     return {
         "title": "Decision",
-        "description": "Les modèles choisis pour la tâche, du meilleur au moins bon, et pourquoi.",
+        "description": "Le modèle suffisant pour la tâche, ses replis, et pourquoi.",
         "type": "object",
         "properties": {
             "choices": {
@@ -104,7 +104,7 @@ def _decision_schema(config: Config) -> dict:
                 "items": {"type": "string", "enum": [m.spec for m in config.models]},
                 "description": (
                     f"De 1 à {MAX_CANDIDATES} modèles distincts au format fournisseur:nom, "
-                    "le meilleur en premier, puis les alternatives en cas d'échec."
+                    "le modèle choisi en premier, puis les replis en cas d'échec."
                 ),
             },
             "reason": {
@@ -123,16 +123,16 @@ def _decision_schema(config: Config) -> dict:
 def _build_prompt(task: str, config: Config) -> str:
     lines = "\n".join(f"- {m.spec}" for m in config.models)
     return (
-        "Tu es un routeur de modèles. Choisis le modèle le plus adapté à la tâche, "
-        "uniquement parmi cette liste :\n"
+        "Tu es un routeur de modèles. Choisis le modèle suffisant pour la tâche : le plus léger "
+        "capable de la réussir sans perte de qualité, uniquement parmi cette liste :\n"
         f"{lines}\n\n"
         "Tu ne disposes que des noms : appuie-toi sur ce que tu sais de ces modèles. "
-        "Réserve les modèles les plus puissants aux tâches complexes "
-        "et prends un modèle léger pour les tâches simples.\n\n"
+        "Ne prends un modèle puissant que si la tâche l'exige ; "
+        "pour une tâche simple, un modèle léger suffit.\n\n"
         f"Tâche :\n{task}\n\n"
         "Réponds avec les noms exacts, tels qu'ils apparaissent dans la liste, au format "
-        f"fournisseur:nom (champ choices) : le meilleur modèle en premier, puis au plus "
-        f"{MAX_CANDIDATES - 1} modèle(s) de repli adapté(s) à la tâche, utilisé(s) si le premier échoue. "
+        f"fournisseur:nom (champ choices) : le modèle choisi en premier, puis au plus "
+        f"{MAX_CANDIDATES - 1} modèle(s) de repli capable(s) de réussir la tâche, utilisé(s) si le premier échoue. "
         "Donne la raison du premier choix (champ reason).\n\n"
         "Langue de la raison : celle de la tâche, pas celle de ces instructions. "
         "Ces instructions sont en français, mais si la tâche est en anglais, la raison est en anglais ; "
