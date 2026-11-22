@@ -76,6 +76,7 @@ def test_discover_config(monkeypatch):
     config = catalog.discover_config()
     assert config.orchestrator == "openai:gpt-4o-mini"
     assert [m.spec for m in config.models] == ["openai:gpt-4o-mini", "anthropic:claude-sonnet-4-6"]
+    assert config.mode == "all"
 
 
 def test_discover_without_keys_raises(monkeypatch):

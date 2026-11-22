@@ -4,23 +4,23 @@
 
 **Apporte tes clés API. Autoroute choisit le modèle.**
 
-Tu donnes à Autoroute ton prompt, c'est-à-dire la tâche à accomplir. Il choisit le modèle suffisant (le plus léger capable de la réussir sans perte de qualité) parmi ceux auxquels **tes clés API donnent accès**, te renvoie son nom et te dit pourquoi. Tu n'as pas à savoir quel modèle utiliser pour quoi.
+Tu donnes à Autoroute ton prompt, c'est-à-dire la tâche à accomplir. Il choisit le modèle suffisant (le plus léger capable de la réussir sans perte de qualité) parmi ceux auxquels **tes clés API donnent accès** et te renvoie son nom. Tu n'as pas à savoir quel modèle utiliser pour quoi : Autoroute le fait à ta place et te dit pourquoi.
 
 ```python
 from langchain.chat_models import init_chat_model
 from autoroute import route
 
 prompt = "Écris une fonction Python qui parse un CSV"
-r = route(prompt)
+r = route(prompt)                 # le choix d'Autoroute : r.model, r.reason, r.fallbacks…
 model = init_chat_model(r.model)  # ex. "anthropic:claude-sonnet-…"
 ```
 
 - **OpenAI, Anthropic, Gemini, Mistral** : les modèles sont découverts avec tes clés, sans liste à maintenir.
 - **Tes clés restent chez toi** : aucun serveur Autoroute, appels directs aux fournisseurs.
-- **Mode souverain** : avec `AUTOROUTE_MODE=sovereign`, seuls les modèles Mistral (France) sont utilisés. Voir [Modes](#modes).
+- **Mode souverain** : avec `AUTOROUTE_MODE=sovereign`, seuls les modèles Mistral (France 🇫🇷 🇪🇺) sont utilisés. Voir [Modes](#modes).
 - **Le bon prix pour chaque tâche** : un modèle léger pour les tâches simples, un modèle puissant seulement quand il le faut. La mesure du gain n'est pas encore disponible.
 - **Chaque choix est expliqué** : la décision et sa raison sont écrites dans un log JSONL.
-- **Ne plante jamais ton application** : orchestrateurs de secours, puis repli sur un modèle découvert.
+- **Le routage ne plante pas ton application** : orchestrateurs de secours, puis repli sur un modèle découvert.
 
 Autoroute n'appelle **pas** le modèle : il te renvoie un objet dont `r.model` est le nom du modèle, au format de LangChain (par défaut) ou au format natif des SDK officiels, de LlamaIndex et de Haystack (`route(prompt, to="native")`).
 
@@ -28,7 +28,7 @@ Autoroute n'appelle **pas** le modèle : il te renvoie un objet dont `r.model` e
 
 ![Comment fonctionne Autoroute](assets/how-it-works.fr.svg)
 
-1. **Découverte** : Autoroute interroge l'API de liste des modèles de chaque fournisseur dont la clé est renseignée, et garde les modèles de chat. Il n'y a aucune liste de modèles à maintenir. La liste est gardée en mémoire 5 minutes : les appels suivants à `route()` ne la redemandent pas.
+1. **Découverte** : Autoroute interroge l'API de liste des modèles de chaque fournisseur dont la clé est renseignée, et garde les modèles de chat. Il n'y a aucune liste de modèles à maintenir. La liste est gardée en mémoire 5 minutes : les appels suivants à `route()` ne la redemandent pas, et la découverte n'est refaite qu'au premier `route()` après ce délai. Chaque commande `autoroute` démarre un nouveau processus et refait donc la découverte. Pour choisir toi-même quand découvrir, voir [`discover_config()`](#choisir-quand-découvrir-les-modèles).
 2. **Routage** : un **orchestrateur**, modèle léger choisi automatiquement parmi tes modèles pour que le routage reste rapide et peu coûteux (ou celui que tu choisis dans `.autoroute/config.yaml`), reçoit ton prompt et cette liste. Il renvoie le modèle suffisant pour la tâche, jusqu'à 2 replis, et la raison de son choix. Sa réponse est limitée aux modèles découverts.
 3. **Log** : chaque décision est écrite dans un log JSONL.
 
@@ -50,7 +50,7 @@ Déjà installés dans ton projet ? Les versions récentes sont conservées : Au
 ```powershell
 autoroute init                   # crée .env.example (et .autoroute/config.yaml, facultatif)
 copy .env.example .env           # macOS / Linux : cp .env.example .env
-# renseigne au moins une clé API dans .env (OpenAI, Anthropic, Gemini ou Mistral)
+# renseigne au moins une clé API (OpenAI, Anthropic, Gemini ou Mistral) dans .env ou dans une variable d'environnement
 autoroute models                 # affiche la source de chaque clé et les modèles découverts
 autoroute route "Conçois l'architecture d'une API de paiement sécurisée, avec gestion des remboursements"
 autoroute ui                     # le log des décisions dans ton navigateur
@@ -84,10 +84,10 @@ Pour l'utiliser avec LangChain (modèle de chat, agent, replis), voir [Utilisati
 Une clé par fournisseur. Laisse une clé vide si tu n'utilises pas ce fournisseur : il est ignoré.
 
 ```
-OPENAI_API_KEY=       # OpenAI Platform
-ANTHROPIC_API_KEY=    # Anthropic Console
-GOOGLE_API_KEY=       # Google AI Studio (Gemini)
-MISTRAL_API_KEY=      # Mistral La Plateforme
+OPENAI_API_KEY=       # https://platform.openai.com/api-keys
+ANTHROPIC_API_KEY=    # https://platform.claude.com (Claude Console)
+GOOGLE_API_KEY=       # https://aistudio.google.com (Gemini)
+MISTRAL_API_KEY=      # https://console.mistral.ai (Mistral AI Studio)
 ```
 
 Les variables d'environnement système sont prioritaires sur `.env`. `autoroute models` affiche la source de chaque clé (`system`, `.env`, `system (.env ignored)` ou `missing`), jamais sa valeur.
@@ -96,7 +96,7 @@ Les variables d'environnement système sont prioritaires sur `.env`. `autoroute 
 
 ### Modes
 
-`AUTOROUTE_MODE` choisit vers quels fournisseurs Autoroute peut router. Pour changer de mode, ajoute par exemple `AUTOROUTE_MODE=sovereign` dans `.env` (ou en variable d'environnement).
+`AUTOROUTE_MODE` choisit vers quels fournisseurs Autoroute peut router. Pour changer de mode, ajoute par exemple `AUTOROUTE_MODE=sovereign` dans `.env` (ou dans une variable d'environnement).
 
 | Mode | Fournisseurs | Clé nécessaire |
 |---|---|---|
@@ -104,7 +104,7 @@ Les variables d'environnement système sont prioritaires sur `.env`. `autoroute 
 | `openai` | OpenAI | `OPENAI_API_KEY` |
 | `anthropic` | Anthropic | `ANTHROPIC_API_KEY` |
 | `gemini` | Gemini | `GOOGLE_API_KEY` |
-| `sovereign` | Mistral uniquement (fournisseur français), avec tous les modèles accessibles par ta clé | `MISTRAL_API_KEY` |
+| `sovereign` | Mistral uniquement (fournisseur français 🇫🇷 🇪🇺), avec tous les modèles accessibles par ta clé | `MISTRAL_API_KEY` |
 
 Le mode s'applique aussi à l'orchestrateur : il appartient toujours à un fournisseur du mode actif.
 
@@ -157,6 +157,23 @@ Elles peuvent aussi être écrites dans `.env`.
 | `AUTOROUTE_MODE` | Mode de routage | `all` |
 | `AUTOROUTE_CONFIG` | Chemin du fichier de config | `.autoroute/config.yaml` |
 | `AUTOROUTE_LOG` | Chemin du fichier de log, ou `stdout` / `off` (voir [Observabilité](#observabilité)) | `.autoroute/log.jsonl` |
+
+### Choisir quand découvrir les modèles
+
+Par défaut, `route(prompt)` découvre les modèles au premier appel et garde la liste 5 minutes (voir [Comment ça marche](#comment-ça-marche)). Pour décider toi-même quand découvrir, appelle `discover_config()` et passe le résultat à `route()` :
+
+```python
+from autoroute import discover_config, route
+
+config = discover_config()        # interroge les fournisseurs maintenant (mode : AUTOROUTE_MODE)
+r = route(prompt, config=config)  # aucune découverte : la liste de config est utilisée telle quelle
+```
+
+- `discover_config()` interroge les fournisseurs à chaque appel, sans cache. `discover_config(mode="sovereign")` impose un mode. Il lève une `ValueError` s'il ne trouve aucun modèle (aucune clé valide).
+- Avec `config=`, la liste ne se met jamais à jour : un nouveau modèle, un modèle retiré ou une nouvelle clé ne sont pris en compte qu'au prochain `discover_config()`. Si ton application tourne longtemps, rappelle-le régulièrement.
+- Les orchestrateurs de secours, le dernier recours et le log fonctionnent comme sans `config`.
+
+Utile pour découvrir les modèles une fois au démarrage de ton application (le premier `route()` ne paie pas la découverte), ou pour garder la même liste pendant un traitement par lots.
 
 ## Utilisation avec LangChain
 
@@ -219,7 +236,7 @@ Voir [`examples/`](examples) :
 |---|---|
 | `01_chat_model.py` | Modèle de chat avec replis |
 | `02_agent.py` | Agent avec `ModelFallbackMiddleware` |
-| `03_modes.py` | Routage de tâches simples et complexes |
+| `03_task_levels.py` | Routage de tâches simples et complexes |
 | `04_fallback.py` | Un vrai repli, avec un modèle principal forcé en échec |
 
 ### Autres frameworks : `to="native"`
@@ -313,7 +330,7 @@ Le serveur n'écoute que sur ta machine (`127.0.0.1`), en lecture seule, et la p
 - Le routage n'est pas déterministe : le même prompt peut recevoir des choix différents, mais raisonnables.
 - Le routage ajoute un appel payant et quelques secondes (environ 1 à 7 s selon l'orchestrateur, dans nos essais).
 - Chaque orchestrateur a 20 s pour répondre, avec une relance au plus : au-delà, l'orchestrateur de secours prend le relais. Dans le pire cas (les 3 orchestrateurs trop lents), le routage peut donc prendre environ 2 minutes avant le repli sur un modèle découvert.
-- Les modèles découverts sont gardés en mémoire 5 minutes : un nouveau modèle d'un fournisseur peut mettre jusqu'à 5 minutes à apparaître. Un changement de clé API, de `AUTOROUTE_MODE` ou de `.autoroute/config.yaml` est pris en compte tout de suite.
+- Les modèles découverts sont gardés en mémoire 5 minutes : un nouveau modèle d'un fournisseur peut mettre jusqu'à 5 minutes à apparaître. Un changement de clé API, de `AUTOROUTE_MODE` ou de `.autoroute/config.yaml` est pris en compte tout de suite (avec `config=discover_config()`, seulement au prochain `discover_config()`). Un fournisseur qui ne répond pas pendant la découverte est écarté jusqu'à la suivante, soit 5 minutes au plus.
 - Un fournisseur peut lister un modèle que ta clé ne peut pas appeler : s'il est choisi, les replis prennent le relais.
 - Un seul choix par prompt : pas de re-routage à chaque étape d'un agent.
 - Aucune vérification des capacités du modèle choisi (appel d'outils, vision).

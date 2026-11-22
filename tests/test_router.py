@@ -72,10 +72,10 @@ def test_single_choice_has_no_fallbacks(config, fake_llm):
     assert route("Dis bonjour", config).fallbacks == []
 
 
-def test_public_api_is_route_only():
+def test_public_api():
     import autoroute
 
-    assert autoroute.__all__ == ["Route", "route"]
+    assert autoroute.__all__ == ["Route", "route", "discover_config"]
     assert not hasattr(autoroute, "route_with_reason")
     assert not hasattr(autoroute, "route_candidates")
 
@@ -324,6 +324,30 @@ def test_route_without_config_discovers_with_env_mode(config, fake_llm, monkeypa
     assert route("Écris du code").model == "anthropic:claude-sonnet-4-6"
     assert seen["mode"] == "anthropic"
     assert read_log()[0]["mode"] == "anthropic"
+
+
+def test_route_with_discovered_config_logs_its_mode(config, fake_llm):
+    # config=discover_config() : le log garde le mode de la découverte, pas "custom".
+    fake_llm(Decision(choices=["openai:gpt-4o-mini"], reason="Simple"))
+    route("Dis bonjour", config.model_copy(update={"mode": "openai"}))
+    assert read_log()[0]["mode"] == "openai"
+
+
+def test_route_with_handmade_config_logs_custom_mode(config, fake_llm):
+    fake_llm(Decision(choices=["openai:gpt-4o-mini"], reason="Simple"))
+    route("Dis bonjour", config)
+    assert read_log()[0]["mode"] == "custom"
+
+
+def test_route_with_config_skips_discovery(config, fake_llm, monkeypatch):
+    # Avec config=, route() ne refait jamais la découverte (ni cache ni appel aux API de liste).
+    def no_discovery(**kw):
+        raise AssertionError("discover_config ne doit pas être appelé")
+
+    monkeypatch.setattr("autoroute.router.discover_config", no_discovery)
+    fake_llm(Decision(choices=["openai:gpt-4o-mini"], reason="Simple"))
+    assert route("Dis bonjour", config).routed is True
+    assert route("Dis bonjour", config).routed is True
 
 
 # --- cache de la découverte ---

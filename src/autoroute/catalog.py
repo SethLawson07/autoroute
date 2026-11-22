@@ -219,4 +219,4 @@ def discover_config(path: str | None = None, mode: str | None = None) -> Config:
         except ValueError as e:
             # Ne pas casser l'application : on prévient et on garde le choix automatique.
             logger.warning(f"{e} Using the automatic choice: {picked[0]}.")
-    return Config(orchestrator=picked[0], backup_orchestrators=picked[1:], models=models)
+    return Config(orchestrator=picked[0], backup_orchestrators=picked[1:], models=models, mode=mode)

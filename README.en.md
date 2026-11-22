@@ -4,23 +4,23 @@
 
 **Bring your API keys. Autoroute picks the model.**
 
-You give Autoroute your prompt, that is, the task to perform. It picks the sufficient model (the lightest one able to do it without losing quality) among those **your API keys can access**, returns its name and tells you why. You don't need to know which model to use for what.
+You give Autoroute your prompt, that is, the task to perform. It picks the sufficient model (the lightest one able to do it without losing quality) among those **your API keys can access** and returns its name. You don't need to know which model to use for what: Autoroute does it for you and tells you why.
 
 ```python
 from langchain.chat_models import init_chat_model
 from autoroute import route
 
 prompt = "Write a Python function that parses a CSV file"
-r = route(prompt)
+r = route(prompt)                 # Autoroute's choice: r.model, r.reason, r.fallbacks…
 model = init_chat_model(r.model)  # e.g. "anthropic:claude-sonnet-…"
 ```
 
 - **OpenAI, Anthropic, Gemini, Mistral**: models are discovered with your keys, no list to maintain.
 - **Your keys stay with you**: no Autoroute server, direct calls to the providers.
-- **Sovereign mode**: with `AUTOROUTE_MODE=sovereign`, only Mistral models (France) are used. See [Modes](#modes).
+- **Sovereign mode**: with `AUTOROUTE_MODE=sovereign`, only Mistral models (France 🇫🇷 🇪🇺) are used. See [Modes](#modes).
 - **The right price for each task**: a lightweight model for simple tasks, a powerful one only when needed. Measuring the savings is not available yet.
 - **Every choice is explained**: the decision and its reason are written to a JSONL log.
-- **Never crashes your application**: backup orchestrators, then fallback to a discovered model.
+- **Routing won't crash your application**: backup orchestrators, then a fallback to a discovered model.
 
 Autoroute does **not** call the model: it returns an object whose `r.model` is the model name, in LangChain format (default) or in the native format of the official SDKs, LlamaIndex and Haystack (`route(prompt, to="native")`).
 
@@ -28,7 +28,7 @@ Autoroute does **not** call the model: it returns an object whose `r.model` is t
 
 ![How Autoroute works](https://raw.githubusercontent.com/SethLawson07/autoroute/main/assets/how-it-works.en.svg)
 
-1. **Discovery**: Autoroute queries the model-listing API of every provider whose key is set, and keeps the chat models. There is no model list to maintain. The list is kept in memory for 5 minutes: later `route()` calls don't fetch it again.
+1. **Discovery**: Autoroute queries the model-listing API of every provider whose key is set, and keeps the chat models. There is no model list to maintain. The list is kept in memory for 5 minutes: later `route()` calls don't fetch it again, and discovery only runs again on the first `route()` after that delay. Each `autoroute` command starts a new process, so it always runs discovery. To choose when discovery happens yourself, see [`discover_config()`](#choosing-when-models-are-discovered).
 2. **Routing**: an **orchestrator**, a lightweight model picked automatically among your models to keep routing fast and cheap (or the one you choose in `.autoroute/config.yaml`), receives your prompt and that list. It returns the sufficient model for the task, up to 2 fallbacks, and the reason for its choice. Its answer is restricted to the discovered models.
 3. **Logging**: every decision is written to a JSONL log.
 
@@ -50,7 +50,7 @@ Already installed in your project? Recent versions are kept: Autoroute only requ
 ```powershell
 autoroute init                   # creates .env.example (and the optional .autoroute/config.yaml)
 copy .env.example .env           # macOS / Linux: cp .env.example .env
-# fill in at least one API key in .env (OpenAI, Anthropic, Gemini or Mistral)
+# fill in at least one API key (OpenAI, Anthropic, Gemini or Mistral) in .env or as an environment variable
 autoroute models                 # shows where each key comes from, and the discovered models
 autoroute route "Design the architecture of a secure payment API, with refund handling"
 autoroute ui                     # the decision log in your browser
@@ -84,10 +84,10 @@ To use it with LangChain (chat model, agent, fallbacks), see [Usage with LangCha
 One key per provider. Leave a key empty if you don't use that provider: it is skipped.
 
 ```
-OPENAI_API_KEY=       # OpenAI Platform
-ANTHROPIC_API_KEY=    # Anthropic Console
-GOOGLE_API_KEY=       # Google AI Studio (Gemini)
-MISTRAL_API_KEY=      # Mistral La Plateforme
+OPENAI_API_KEY=       # https://platform.openai.com/api-keys
+ANTHROPIC_API_KEY=    # https://platform.claude.com (Claude Console)
+GOOGLE_API_KEY=       # https://aistudio.google.com (Gemini)
+MISTRAL_API_KEY=      # https://console.mistral.ai (Mistral AI Studio)
 ```
 
 System environment variables take precedence over `.env`. `autoroute models` shows the source of each key (`system`, `.env`, `system (.env ignored)` or `missing`), never its value.
@@ -104,7 +104,7 @@ System environment variables take precedence over `.env`. `autoroute models` sho
 | `openai` | OpenAI | `OPENAI_API_KEY` |
 | `anthropic` | Anthropic | `ANTHROPIC_API_KEY` |
 | `gemini` | Gemini | `GOOGLE_API_KEY` |
-| `sovereign` | Mistral only (French provider), all models available to your key | `MISTRAL_API_KEY` |
+| `sovereign` | Mistral only (French provider 🇫🇷 🇪🇺), all models available to your key | `MISTRAL_API_KEY` |
 
 The mode also applies to the orchestrator: it always belongs to a provider of the active mode.
 
@@ -157,6 +157,23 @@ They can also be set in `.env`.
 | `AUTOROUTE_MODE` | Routing mode | `all` |
 | `AUTOROUTE_CONFIG` | Path to the config file | `.autoroute/config.yaml` |
 | `AUTOROUTE_LOG` | Path to the log file, or `stdout` / `off` (see [Observability](#observability)) | `.autoroute/log.jsonl` |
+
+### Choosing when models are discovered
+
+By default, `route(prompt)` discovers the models on the first call and keeps the list for 5 minutes (see [How it works](#how-it-works)). To decide when discovery happens yourself, call `discover_config()` and pass the result to `route()`:
+
+```python
+from autoroute import discover_config, route
+
+config = discover_config()        # queries the providers now (mode: AUTOROUTE_MODE)
+r = route(prompt, config=config)  # no discovery: the list in config is used as is
+```
+
+- `discover_config()` queries the providers on every call, with no cache. `discover_config(mode="sovereign")` forces a mode. It raises a `ValueError` if it finds no model (no valid key).
+- With `config=`, the list is never refreshed: a new model, a retired model or a new key are only taken into account on the next `discover_config()`. If your application runs for a long time, call it again regularly.
+- Backup orchestrators, the last resort and the log work the same as without `config`.
+
+Useful to discover the models once when your application starts (the first `route()` doesn't pay for discovery), or to keep the same list during a batch job.
 
 ## Usage with LangChain
 
@@ -219,7 +236,7 @@ See [`examples/`](https://github.com/SethLawson07/autoroute/tree/main/examples):
 |---|---|
 | `01_chat_model.py` | Chat model with fallbacks |
 | `02_agent.py` | Agent with `ModelFallbackMiddleware` |
-| `03_modes.py` | Routing of simple and complex tasks |
+| `03_task_levels.py` | Routing of simple and complex tasks |
 | `04_fallback.py` | A real fallback, with a primary model forced to fail |
 
 ### Other frameworks: `to="native"`
@@ -313,7 +330,7 @@ The server only listens on your machine (`127.0.0.1`), read-only, and the page l
 - Routing is not deterministic: the same prompt can get different (reasonable) choices.
 - Routing adds one paid call and a few seconds (about 1 to 7 s depending on the orchestrator, in our tests).
 - Each orchestrator has 20 s to answer, with at most one retry: beyond that, the backup orchestrator takes over. In the worst case (all 3 orchestrators too slow), routing can therefore take about 2 minutes before falling back to a discovered model.
-- Discovered models are kept in memory for 5 minutes: a provider's new model can take up to 5 minutes to show up. A change of API key, `AUTOROUTE_MODE` or `.autoroute/config.yaml` takes effect immediately.
+- Discovered models are kept in memory for 5 minutes: a provider's new model can take up to 5 minutes to show up. A change of API key, `AUTOROUTE_MODE` or `.autoroute/config.yaml` takes effect immediately (with `config=discover_config()`, only on the next `discover_config()`). A provider that doesn't answer during discovery is left out until the next one, so for 5 minutes at most.
 - A provider may list a model your key cannot call: if it is chosen, the fallbacks take over.
 - One choice per prompt: no re-routing at each step of an agent.
 - No check of the chosen model's capabilities (tool calling, vision).

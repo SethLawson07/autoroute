@@ -49,6 +49,7 @@ class Config(BaseModel):
     orchestrator: str          # "provider:name", premier orchestrateur essayé
     models: list[ModelConfig]  # modèles découverts chez les fournisseurs
     backup_orchestrators: list[str] = []  # essayés dans l'ordre si l'orchestrateur échoue
+    mode: str = "custom"  # mode de la découverte (discover_config) ; "custom" : config faite à la main
 
     @property
     def orchestrators(self) -> list[str]:

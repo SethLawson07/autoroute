@@ -214,7 +214,7 @@ def route(task: str, config: Config | None = None, to: str = "langchain") -> Rou
         raise ValueError(f"Unknown to={to!r}. Accepted values: {', '.join(FORMATS)}.")
     start = time.perf_counter()
     decision_id = uuid4().hex
-    mode = "custom" if config else "all"
+    mode = config.mode if config else "all"  # le log garde le mode de la découverte
     elapsed = lambda: int((time.perf_counter() - start) * 1000)
 
     if config is None:
