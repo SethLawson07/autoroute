@@ -44,6 +44,8 @@ class FakeLLM:
     def invoke(self, prompt):
         self.prompt = prompt
         # Avec un schéma dict, LangChain renvoie un dict, pas un objet Pydantic.
+        if isinstance(self.decision, dict):
+            return self.decision  # réponse brute, ex. un champ manquant
         return self.decision.model_dump()
 
 

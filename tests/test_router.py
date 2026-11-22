@@ -32,12 +32,12 @@ def config3(config):
 # --- le prompt de l'orchestrateur ---
 
 def test_prompt_asks_for_sufficient_model_not_best(config3):
-    # « meilleur » tire l'orchestrateur vers les gros modèles : on demande le modèle suffisant.
+    # « best » (meilleur) tire l'orchestrateur vers les gros modèles : on demande le modèle suffisant.
     schema = json.dumps(_decision_schema(config3), ensure_ascii=False)
     prompt = _build_prompt("Traduis « bonjour » en anglais", config3)
     for text in (prompt, schema):
-        assert "meilleur" not in text.lower()
-        assert "suffisant" in text.lower()
+        assert "best" not in text.lower()
+        assert "sufficient" in text.lower()
 
 
 # --- l'objet Route ---
@@ -98,10 +98,11 @@ def test_prompt_contains_models_and_task(config, fake_llm):
 def test_prompt_asks_reason_in_task_language(config, fake_llm):
     fake = fake_llm(Decision(choices=["openai:gpt-4o-mini"], reason="Simple task"))
     route("Say hello", config)
-    assert "celle de la tâche, pas celle de ces instructions" in fake.prompt
+    assert "the task's language, not the language of these instructions" in fake.prompt
     # La consigne de langue vient après la tâche : c'est la dernière chose que lit l'orchestrateur.
-    assert fake.prompt.index("Say hello") < fake.prompt.index("Langue de la raison")
-    assert "langue de la tâche" in fake.schema["properties"]["reason"]["description"]
+    assert fake.prompt.index("Say hello") < fake.prompt.index("Language of the reason")
+    assert "the task is written in" in fake.schema["properties"]["language"]["description"]
+    assert "language" in fake.schema["properties"]["reason"]["description"]
 
 
 def test_schema_restricts_choice_to_discovered_models(config, fake_llm):
@@ -109,8 +110,23 @@ def test_schema_restricts_choice_to_discovered_models(config, fake_llm):
     route("Dis bonjour", config)
     items = fake.schema["properties"]["choices"]["items"]
     assert items["enum"] == ["openai:gpt-4o-mini", "anthropic:claude-sonnet-4-6"]
-    assert fake.schema["required"] == ["choices", "reason"]
+    assert fake.schema["required"] == ["choices", "language", "reason"]
     assert fake.kwargs.get("strict") is True
+
+
+def test_language_comes_before_reason(config):
+    # L'orchestrateur nomme la langue de la tâche avant de rédiger la raison : la raison
+    # suit alors la tâche, pas le français des instructions (qualification du 2026-11-22).
+    schema = _decision_schema(config)
+    assert list(schema["properties"]) == ["choices", "language", "reason"]
+    assert "language" in schema["properties"]["reason"]["description"]
+    assert "(field language)" in _build_prompt("Say hello", config)
+
+
+def test_decision_without_language_still_routes(config, fake_llm):
+    # Un fournisseur qui omet language ne casse pas le routage (principe 8).
+    fake_llm({"choices": ["openai:gpt-4o-mini"], "reason": "Simple"})
+    assert route("Dis bonjour", config).routed is True
 
 
 def test_fallbacks_keep_order(config3, fake_llm):

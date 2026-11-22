@@ -33,6 +33,7 @@ logger = logging.getLogger(__name__)
 
 class Decision(BaseModel):
     choices: list[str]  # modèles au format provider:nom, le modèle choisi en premier
+    language: str = ""  # langue de la tâche, écrite avant reason pour que la raison la suive
     reason: str         # pourquoi le premier choix, en une ou deux phrases
 
 
@@ -94,28 +95,36 @@ def _decision_schema(config: Config) -> dict:
     valider. Si un fournisseur n'applique pas l'enum, _candidates et le repli prennent le
     relais au lieu d'une ValidationError.
     """
+    # Prompt et schéma en anglais : en français, Magistral rédigeait la raison en français même
+    # pour une tâche en anglais (qualification du 2026-11-22). En anglais, les 4 orchestrateurs
+    # suivent la langue de la tâche (essai : anglais, français, espagnol, 24/24).
     return {
         "title": "Decision",
-        "description": "Le modèle suffisant pour la tâche, ses replis, et pourquoi.",
+        "description": "The sufficient model for the task, its fallbacks, and why.",
         "type": "object",
         "properties": {
             "choices": {
                 "type": "array",
                 "items": {"type": "string", "enum": [m.spec for m in config.models]},
                 "description": (
-                    f"De 1 à {MAX_CANDIDATES} modèles distincts au format fournisseur:nom, "
-                    "le modèle choisi en premier, puis les replis en cas d'échec."
+                    f"1 to {MAX_CANDIDATES} distinct models as provider:name, "
+                    "the chosen model first, then the fallbacks."
                 ),
+            },
+            # Avant reason : l'orchestrateur nomme la langue de la tâche, puis rédige la raison.
+            "language": {
+                "type": "string",
+                "description": "The language the task is written in (e.g. English, français, español).",
             },
             "reason": {
                 "type": "string",
                 "description": (
-                    "Pourquoi le premier modèle, en une ou deux phrases, dans la langue de la tâche "
-                    "(pas forcément le français)."
+                    "Why the first model, in one or two sentences, written in the language "
+                    "given in language (not necessarily English)."
                 ),
             },
         },
-        "required": ["choices", "reason"],
+        "required": ["choices", "language", "reason"],
         "additionalProperties": False,
     }
 
@@ -123,20 +132,21 @@ def _decision_schema(config: Config) -> dict:
 def _build_prompt(task: str, config: Config) -> str:
     lines = "\n".join(f"- {m.spec}" for m in config.models)
     return (
-        "Tu es un routeur de modèles. Choisis le modèle suffisant pour la tâche : le plus léger "
-        "capable de la réussir sans perte de qualité, uniquement parmi cette liste :\n"
+        "You are a model router. Pick the sufficient model for the task: the lightest one able "
+        "to do it without losing quality, only from this list:\n"
         f"{lines}\n\n"
-        "Tu ne disposes que des noms : appuie-toi sur ce que tu sais de ces modèles. "
-        "Ne prends un modèle puissant que si la tâche l'exige ; "
-        "pour une tâche simple, un modèle léger suffit.\n\n"
-        f"Tâche :\n{task}\n\n"
-        "Réponds avec les noms exacts, tels qu'ils apparaissent dans la liste, au format "
-        f"fournisseur:nom (champ choices) : le modèle choisi en premier, puis au plus "
-        f"{MAX_CANDIDATES - 1} modèle(s) de repli capable(s) de réussir la tâche, utilisé(s) si le premier échoue. "
-        "Donne la raison du premier choix (champ reason).\n\n"
-        "Langue de la raison : celle de la tâche, pas celle de ces instructions. "
-        "Ces instructions sont en français, mais si la tâche est en anglais, la raison est en anglais ; "
-        "en espagnol, en espagnol ; et ainsi de suite. Rédige en français seulement si la tâche est en français."
+        "You only have the names: rely on what you know about these models. "
+        "Only pick a powerful model if the task requires it; "
+        "for a simple task, a lightweight model is enough.\n\n"
+        f"Task:\n{task}\n\n"
+        "Answer with the exact names, as they appear in the list, as provider:name "
+        "(field choices): the chosen model first, then at most "
+        f"{MAX_CANDIDATES - 1} fallback model(s) able to do the task, used if the first one fails. "
+        "Then give the language the task is written in (field language), "
+        "and the reason for the first choice written in that language (field reason).\n\n"
+        "Language of the reason: the task's language, not the language of these instructions. "
+        "These instructions are in English, but if the task is in French, the reason is in French; "
+        "in Spanish, in Spanish; and so on. Write in English only if the task is in English."
     )
 
 
