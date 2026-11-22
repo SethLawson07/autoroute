@@ -1,12 +1,14 @@
 import json
+import logging
 import re
-import warnings
 
 import httpx
 
 from autoroute.config import (
     ENV_KEYS, LIGHT_FAMILIES, MODES, Config, ModelConfig, get_api_key, get_mode, load_orchestrator,
 )
+
+logger = logging.getLogger(__name__)
 
 SUPPORTED = MODES["all"]
 
@@ -26,7 +28,7 @@ _GEMINI_EXCLUDE = (
 def list_models(provider: str) -> list[str]:
     key = get_api_key(provider)
     if key is None:
-        raise ValueError(f"Clé manquante pour {provider}")
+        raise ValueError(f"Missing API key for {provider}")
 
     if provider == "openai":
         r = httpx.get(
@@ -91,7 +93,7 @@ def list_models(provider: str) -> list[str]:
             if m.get("capabilities", {}).get("completion_chat", False)
         )
 
-    raise ValueError(f"Fournisseur non géré : {provider}")
+    raise ValueError(f"Unsupported provider: {provider}")
 
 
 def _dedupe_dated(ids: list[str]) -> list[str]:
@@ -107,10 +109,10 @@ def list_chat_models(provider: str) -> list[str]:
     try:
         ids = list_models(provider)
     except httpx.HTTPStatusError as e:
-        raise ValueError(f"clé refusée ou API indisponible ({e.response.status_code})")
+        raise ValueError(f"key rejected or API unavailable ({e.response.status_code})")
     except (KeyError, TypeError, AttributeError, json.JSONDecodeError) as e:
         # Format de réponse changé par le fournisseur : on ignore ce fournisseur, pas tout.
-        raise ValueError(f"réponse inattendue de l'API ({type(e).__name__})") from e
+        raise ValueError(f"unexpected API response ({type(e).__name__})") from e
     if provider == "openai":
         ids = [
             i for i in ids
@@ -134,11 +136,11 @@ def _resolve_orchestrator(wanted: str, models: list[ModelConfig]) -> str:
 
     if not matches:
         raise ValueError(
-            f"Orchestrateur « {wanted} » introuvable parmi les modèles disponibles "
-            "(clé API manquante ou modèle indisponible). Vérifie avec « autoroute models »."
+            f"Orchestrator '{wanted}' not found among the available models "
+            "(missing API key or unavailable model). Check with 'autoroute models'."
         )
     if len(matches) > 1:
-        raise ValueError(f"« {wanted} » existe chez plusieurs fournisseurs : écris provider:nom")
+        raise ValueError(f"'{wanted}' exists at several providers: write provider:name")
     return matches[0].spec
 
 
@@ -201,14 +203,14 @@ def discover_config(path: str | None = None, mode: str | None = None) -> Config:
                 for name in list_chat_models(provider)
             ]
         except (ValueError, httpx.HTTPError) as e:
-            errors.append(f"{provider} : {e}")
+            errors.append(f"{provider}: {e}")
 
     if errors and models:
-        warnings.warn("Fournisseurs ignorés : " + " ; ".join(errors))
+        logger.warning("Providers skipped: " + "; ".join(errors))
     if not models:
-        keys = " ou ".join(ENV_KEYS[p] for p in MODES[mode])
-        detail = f" Erreurs : {' ; '.join(errors)}" if errors else ""
-        raise ValueError(f"Aucun modèle trouvé en mode « {mode} » : vérifie {keys} dans .env.{detail}")
+        keys = " or ".join(ENV_KEYS[p] for p in MODES[mode])
+        detail = f" Errors: {'; '.join(errors)}" if errors else ""
+        raise ValueError(f"No model found in '{mode}' mode: check {keys} (environment variable or .env).{detail}")
     picked = _pick_orchestrators(mode, models)
     if wanted:
         try:
@@ -216,5 +218,5 @@ def discover_config(path: str | None = None, mode: str | None = None) -> Config:
             picked = [forced] + [o for o in picked if o != forced][: MAX_ORCHESTRATORS - 1]
         except ValueError as e:
             # Ne pas casser l'application : on prévient et on garde le choix automatique.
-            warnings.warn(f"{e} Choix automatique utilisé : {picked[0]}.")
-    return Config(orchestrator=picked[0], backup_orchestrators=picked[1:], models=models)
+            logger.warning(f"{e} Using the automatic choice: {picked[0]}.")
+    return Config(orchestrator=picked[0], backup_orchestrators=picked[1:], models=models, mode=mode)

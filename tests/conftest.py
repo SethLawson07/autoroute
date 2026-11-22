@@ -12,6 +12,9 @@ def isolated(tmp_path, monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
     for var in ("GOOGLE_API_KEY", "MISTRAL_API_KEY", "AUTOROUTE_MODE", "AUTOROUTE_CONFIG"):
         monkeypatch.delenv(var, raising=False)
+    # Le cache de la découverte ne doit pas passer d'un test à l'autre.
+    monkeypatch.setattr("autoroute.router._discovery_cache", {})
+    monkeypatch.setattr("autoroute.observability._unwritable", set())
 
 
 @pytest.fixture
@@ -41,6 +44,8 @@ class FakeLLM:
     def invoke(self, prompt):
         self.prompt = prompt
         # Avec un schéma dict, LangChain renvoie un dict, pas un objet Pydantic.
+        if isinstance(self.decision, dict):
+            return self.decision  # réponse brute, ex. un champ manquant
         return self.decision.model_dump()
 
 
@@ -50,5 +55,19 @@ def fake_llm(monkeypatch):
         fake = FakeLLM(decision)
         monkeypatch.setattr("autoroute.router.init_chat_model", lambda spec, **kw: fake)
         return fake
+
+    return install
+
+@pytest.fixture
+def fake_orchestrators(monkeypatch):
+    """Une réponse par orchestrateur : une Decision, ou une exception à lever."""
+    def install(answers):
+        def init(spec, **kw):
+            answer = answers[spec]
+            if isinstance(answer, Exception):
+                raise answer
+            return FakeLLM(answer)
+
+        monkeypatch.setattr("autoroute.router.init_chat_model", init)
 
     return install

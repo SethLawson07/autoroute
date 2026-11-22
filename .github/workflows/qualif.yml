@@ -56,6 +56,8 @@ jobs:
           "$BIN/autoroute" init
           test -f .autoroute/config.yaml
           test -f .env.example
+          "$BIN/python" -c "from importlib.resources import files; assert files('autoroute.templates').joinpath('ui.html').is_file()"
+          "$BIN/autoroute" ui --help
 
           # Sans clé : erreur propre (code 1), jamais de trace Python.
           set +e

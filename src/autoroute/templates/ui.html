@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Autoroute · log</title>
+<style>
+  :root {
+    --bg: #f7f7f5; --panel: #ffffff; --text: #1d1d1b; --muted: #6b6b66; --line: #e4e4df;
+    --accent: #2f5fd0; --ok: #1f8a4c; --warn: #b7791f; --bad: #c53030;     --mono: Consolas, Menlo, "DejaVu Sans Mono", monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #161614; --panel: #1f1f1c; --text: #ecece8; --muted: #9a9a93; --line: #33332f;
+      --accent: #7c9ef0; --ok: #4cc27f; --warn: #e0a84a; --bad: #f07272;     }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); }
+  header { padding: 16px 24px; border-bottom: 1px solid var(--line); background: var(--panel); }
+  header .wrap { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; max-width: 1400px; margin: 0 auto; }
+  header h1 { font-size: 18px; margin: 0; }
+  header .path { font-family: var(--mono); color: var(--muted); font-size: 12px; }
+  header .spacer { flex: 1; }
+  main { padding: 20px 24px; max-width: 1400px; margin: 0 auto; }
+  button, select, input { font: inherit; color: inherit; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 5px 9px; }
+  button { cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  label.inline { display: inline-flex; gap: 6px; align-items: center; color: var(--muted); }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; }
+  .card .label { color: var(--muted); font-size: 12px; }
+  .card .value { font-size: 22px; font-weight: 600; margin-top: 2px; }
+  .dists { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  .dist h2, .detail h2 { font-size: 13px; margin: 0 0 8px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+  .bar-row { display: grid; grid-template-columns: minmax(0, 1fr) 48px; gap: 2px 8px; align-items: end; margin: 6px 0 10px; }
+  .bar-row .name { grid-column: 1; font-family: var(--mono); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bar-row .n { grid-column: 2; grid-row: 1 / span 2; align-self: center; text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .bar-row .track { grid-column: 1; height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+  .bar-row .fill { display: block; height: 100%; border-radius: 3px; background: var(--accent); }
+  .filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
+  .filters input[type=search] { min-width: 260px; flex: 1; }
+  .layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .layout.with-detail { grid-template-columns: minmax(0, 3fr) minmax(320px, 2fr); }
+  @media (max-width: 900px) { .layout.with-detail { grid-template-columns: minmax(0, 1fr); } }
+  .table-wrap { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; overflow: auto; max-height: 70vh; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { position: sticky; top: 0; background: var(--panel); color: var(--muted); font-weight: 600; font-size: 12px; z-index: 1; }
+  tbody tr { cursor: pointer; }
+  tbody tr:hover { background: color-mix(in srgb, var(--accent) 7%, transparent); }
+  tbody tr.selected { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+  td.mono { font-family: var(--mono); font-size: 12px; white-space: nowrap; }
+  td.task { max-width: 420px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .badge { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .badge.ok { color: var(--ok); background: color-mix(in srgb, var(--ok) 14%, transparent); }
+  .badge.backup { color: var(--warn); background: color-mix(in srgb, var(--warn) 14%, transparent); }
+  .badge.fallback, .badge.error { color: var(--bad); background: color-mix(in srgb, var(--bad) 14%, transparent); }
+  .detail { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; align-self: start; position: sticky; top: 12px; max-height: 80vh; overflow: auto; }
+  .detail .head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .detail dl { margin: 0; display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 6px 12px; }
+  .detail dt { color: var(--muted); }
+  .detail dd { margin: 0; word-break: break-word; }
+  .detail pre { margin: 0; white-space: pre-wrap; font-family: var(--mono); font-size: 12px; background: var(--bg); padding: 8px; border-radius: 6px; }
+  .detail ol { margin: 0; padding-left: 20px; font-family: var(--mono); font-size: 12px; }
+  .notice { padding: 12px 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); margin-bottom: 16px; }
+  .notice.bad { border-color: var(--bad); color: var(--bad); }
+  .muted { color: var(--muted); }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<header><div class="wrap">
+  <h1>Autoroute · log</h1>
+  <span class="path" id="path"></span>
+  <span class="spacer"></span>
+  <span class="muted" id="counts"></span>
+  <label class="inline"><input type="checkbox" id="auto"> Refresh every 5 s</label>
+  <button id="refresh" type="button">Refresh</button>
+</div></header>
+
+<main>
+  <div class="notice bad" id="error" hidden></div>
+
+  <section class="cards" id="cards"></section>
+
+  <section class="dists">
+    <div class="card dist"><h2>Chosen models</h2><div id="models"></div></div>
+    <div class="card dist"><h2>Orchestrators</h2><div id="orchestrators"></div></div>
+  </section>
+
+  <section class="filters">
+    <input type="search" id="q" placeholder="Search task, reason, model…">
+    <select id="f-mode"><option value="">All modes</option></select>
+    <select id="f-model"><option value="">All models</option></select>
+    <select id="f-status">
+      <option value="">All statuses</option>
+      <option value="ok">OK</option>
+      <option value="backup">Backup used</option>
+      <option value="fallback">Not routed (fallback)</option>
+      <option value="error">Error (no model)</option>
+      <option value="problems">All incidents</option>
+    </select>
+    <span class="muted" id="shown"></span>
+  </section>
+
+  <div class="layout" id="layout">
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>Date</th><th>Task</th><th>Chosen model</th><th>Orchestrator</th><th>Mode</th><th class="num">Latency</th><th>Status</th>
+        </tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <aside class="detail" id="detail" hidden></aside>
+  </div>
+</main>
+
+<script>
+"use strict";
+const STATUS = {
+  ok: "OK",
+  backup: "Backup used",
+  fallback: "Not routed",
+  error: "Error",
+};
+const $ = (id) => document.getElementById(id);
+let data = null;
+let selectedId = null;
+let timer = null;
+
+function el(tag, props = {}, children = []) {
+  const node = document.createElement(tag);
+  for (const [k, v] of Object.entries(props)) {
+    if (k === "text") node.textContent = v;
+    else if (k === "class") node.className = v;
+    else node.setAttribute(k, v);
+  }
+  for (const c of [].concat(children)) if (c != null) node.append(c);
+  return node;
+}
+
+function fmtDate(iso) {
+  const d = new Date(iso);
+  return isNaN(d) ? (iso || "") : d.toLocaleString();
+}
+function fmtMs(ms) {
+  if (ms == null) return "–";
+  return ms >= 1000 ? (ms / 1000).toFixed(1) + " s" : ms + " ms";
+}
+function badge(status) {
+  return el("span", { class: "badge " + status, text: STATUS[status] || status });
+}
+
+function renderCards(s) {
+  const cards = [
+    ["Decisions shown", s.count],
+    ["Not routed", s.routing_failed_pct + " %"],
+    ["Invalid choices", s.invalid_choice_pct + " %"],
+    ["Errors (no model)", s.error_pct + " %"],
+    ["Mean routing latency", fmtMs(s.mean_latency_ms)],
+  ];
+  $("cards").replaceChildren(...cards.map(([label, value]) =>
+    el("div", { class: "card" }, [el("div", { class: "label", text: label }), el("div", { class: "value", text: String(value) })])
+  ));
+}
+
+function renderDist(target, pairs) {
+  const box = $(target);
+  if (!pairs.length) { box.replaceChildren(el("div", { class: "muted", text: "No data" })); return; }
+  const max = pairs[0][1];
+  box.replaceChildren(...pairs.slice(0, 12).map(([name, n]) => {
+    const fill = el("span", { class: "fill" });
+    fill.style.width = (100 * n / max) + "%";
+    return el("div", { class: "bar-row" }, [
+      el("div", { class: "name", title: name, text: name }),
+      el("div", { class: "n", text: String(n) }),
+      el("div", { class: "track" }, fill),
+    ]);
+  }));
+}
+
+function fillSelect(id, values, label) {
+  const sel = $(id);
+  const current = sel.value;
+  sel.replaceChildren(el("option", { value: "", text: label }), ...values.map((v) => el("option", { value: v, text: v })));
+  sel.value = values.includes(current) ? current : "";
+}
+
+function filtered() {
+  const q = $("q").value.trim().toLowerCase();
+  const mode = $("f-mode").value, model = $("f-model").value, status = $("f-status").value;
+  return data.decisions.filter((d) => {
+    if (mode && d.mode !== mode) return false;
+    if (model && d.model !== model) return false;
+    if (status === "problems" ? d.status === "ok" : status && d.status !== status) return false;
+    if (q) {
+      const hay = [d.task, d.reason, d.model, d.orchestrator, d.error, d.decision_id, ...(d.candidates || [])].join(" ").toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+}
+
+function renderRows() {
+  const list = filtered();
+  $("shown").textContent = list.length + " / " + data.decisions.length;
+  $("rows").replaceChildren(...list.map((d) => {
+    const tr = el("tr", {}, [
+      el("td", { class: "mono", text: fmtDate(d.timestamp) }),
+      el("td", { class: "task", title: d.task || "", text: d.task || "" }),
+      el("td", { class: "mono", text: d.model || "–" }),
+      el("td", { class: "mono", text: d.orchestrator || "–" }),
+      el("td", { text: d.mode || "" }),
+      el("td", { class: "num", text: fmtMs(d.latency_ms) }),
+      el("td", {}, badge(d.status)),
+    ]);
+    if (d.decision_id && d.decision_id === selectedId) tr.classList.add("selected");
+    tr.addEventListener("click", () => { selectedId = d.decision_id; renderRows(); renderDetail(d); });
+    return tr;
+  }));
+}
+
+function renderDetail(d) {
+  const box = $("detail");
+  if (!d) { box.hidden = true; $("layout").classList.remove("with-detail"); return; }
+  const close = el("button", { type: "button", text: "Close" });
+  close.addEventListener("click", () => { selectedId = null; renderRows(); renderDetail(null); });
+  const rows = [
+    ["Date", fmtDate(d.timestamp)],
+    ["Status", badge(d.status)],
+    ["Task", el("pre", { text: d.task || "" })],
+    ["Chosen model", d.model || "–"],
+    ["Candidates", (d.candidates || []).length ? el("ol", {}, d.candidates.map((c) => el("li", { text: c }))) : "–"],
+    ["Reason", d.reason || "–"],
+    ["Orchestrator", d.orchestrator || "–"],
+    ["Mode", d.mode || ""],
+    ["Latency", fmtMs(d.latency_ms)],
+    ["Invalid choice", d.invalid_choice ? "yes" : "no"],
+    ["Errors", d.error ? el("pre", { text: d.error }) : "none"],
+    ["decision_id", el("code", { text: d.decision_id || "" })],
+  ];
+  box.replaceChildren(
+    el("div", { class: "head" }, [el("h2", { text: "Decision details" }), close]),
+    el("dl", {}, rows.flatMap(([k, v]) => [el("dt", { text: k }), el("dd", {}, typeof v === "string" ? document.createTextNode(v) : v)])),
+  );
+  box.hidden = false;
+  $("layout").classList.add("with-detail");
+}
+
+function render() {
+  $("path").textContent = data.path || "";
+  const err = $("error");
+  if (data.error) {
+    err.textContent = data.error;
+    err.hidden = false;
+    data.decisions = [];
+    data.summary = { count: 0, routing_failed_pct: 0, invalid_choice_pct: 0, error_pct: 0, mean_latency_ms: null, models: [], orchestrators: [] };
+  } else if (data.skipped) {
+    err.textContent = data.skipped + " unreadable line(s) skipped in the log.";
+    err.hidden = false;
+  } else {
+    err.hidden = true;
+  }
+  $("counts").textContent = data.error ? "" :
+    (data.total > data.shown ? "last " + data.shown + " of " + data.total + " decisions" : data.total + " decision(s)");
+  renderCards(data.summary);
+  renderDist("models", data.summary.models);
+  renderDist("orchestrators", data.summary.orchestrators);
+  const uniq = (k) => [...new Set(data.decisions.map((d) => d[k]).filter(Boolean))].sort();
+  fillSelect("f-mode", uniq("mode"), "All modes");
+  fillSelect("f-model", uniq("model"), "All models");
+  renderRows();
+  renderDetail(data.decisions.find((d) => d.decision_id && d.decision_id === selectedId) || null);
+}
+
+async function load() {
+  try {
+    const res = await fetch("/api/log", { cache: "no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    data = await res.json();
+  } catch (e) {
+    data = { error: "Cannot read the log: is the 'autoroute ui' server still running? (" + e.message + ")" };
+  }
+  render();
+}
+
+$("refresh").addEventListener("click", load);
+$("auto").addEventListener("change", (e) => {
+  clearInterval(timer);
+  timer = e.target.checked ? setInterval(load, 5000) : null;
+});
+for (const id of ["q", "f-mode", "f-model", "f-status"]) $(id).addEventListener("input", () => data && renderRows());
+load();
+</script>
+</body>
+</html>

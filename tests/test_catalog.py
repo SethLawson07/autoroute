@@ -56,13 +56,13 @@ def test_resolve_qualified():
 
 
 def test_resolve_unknown_raises():
-    with pytest.raises(ValueError, match="introuvable"):
+    with pytest.raises(ValueError, match="not found"):
         catalog._resolve_orchestrator("inconnu", models())
 
 
 def test_resolve_ambiguous_raises():
     both = [ModelConfig(name="x", provider="openai"), ModelConfig(name="x", provider="anthropic")]
-    with pytest.raises(ValueError, match="plusieurs"):
+    with pytest.raises(ValueError, match="several providers"):
         catalog._resolve_orchestrator("x", both)
 
 
@@ -76,13 +76,14 @@ def test_discover_config(monkeypatch):
     config = catalog.discover_config()
     assert config.orchestrator == "openai:gpt-4o-mini"
     assert [m.spec for m in config.models] == ["openai:gpt-4o-mini", "anthropic:claude-sonnet-4-6"]
+    assert config.mode == "all"
 
 
 def test_discover_without_keys_raises(monkeypatch):
     write_config("orchestrators:\n  all: gpt-4o-mini\n")
     monkeypatch.delenv("OPENAI_API_KEY")
     monkeypatch.delenv("ANTHROPIC_API_KEY")
-    with pytest.raises(ValueError, match="Aucun modèle"):
+    with pytest.raises(ValueError, match="No model found"):
         catalog.discover_config()
 
 def fake_models(monkeypatch, by_provider):
@@ -155,11 +156,11 @@ def test_user_orchestrator_overrides_automatic(monkeypatch):
     assert config.backup_orchestrators == ["openai:gpt-4o-mini"]
 
 
-def test_unreachable_user_orchestrator_warns_and_uses_automatic(monkeypatch):
+def test_unreachable_user_orchestrator_warns_and_uses_automatic(monkeypatch, caplog):
     write_config("orchestrators:\n  all: openai:modele-retire\n")
     fake_models(monkeypatch, {"openai": ["gpt-5-mini"]})
-    with pytest.warns(UserWarning, match="modele-retire"):
-        config = catalog.discover_config()
+    config = catalog.discover_config()
+    assert "modele-retire" in caplog.text
     assert config.orchestrator == "openai:gpt-5-mini"
 
 
@@ -168,17 +169,17 @@ def test_unexpected_api_response_is_a_clean_error(monkeypatch):
         return {}["data"]  # KeyError : le fournisseur a changé sa réponse
 
     monkeypatch.setattr(catalog, "list_models", changed_format)
-    with pytest.raises(ValueError, match="réponse inattendue"):
+    with pytest.raises(ValueError, match="unexpected API response"):
         catalog.list_chat_models("openai")
 
 
-def test_unexpected_api_response_skips_only_that_provider(monkeypatch):
+def test_unexpected_api_response_skips_only_that_provider(monkeypatch, caplog):
     def list_models(provider):
         if provider == "openai":
             raise KeyError("data")
         return ["claude-haiku-5-5"]
 
     monkeypatch.setattr(catalog, "list_models", list_models)
-    with pytest.warns(UserWarning, match="openai : réponse inattendue"):
-        config = catalog.discover_config()
+    config = catalog.discover_config()
+    assert "openai: unexpected API response" in caplog.text
     assert [m.spec for m in config.models] == ["anthropic:claude-haiku-5-5"]

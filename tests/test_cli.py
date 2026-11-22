@@ -16,7 +16,7 @@ def test_init_creates_files():
     assert "orchestrators:" in CONFIG.read_text(encoding="utf-8")
     assert "MISTRAL_API_KEY=" in Path(".env.example").read_text(encoding="utf-8")
     assert "*.jsonl" in Path(".autoroute/.gitignore").read_text(encoding="utf-8")
-    assert "Créé : .autoroute/config.yaml" in result.output
+    assert "Created: .autoroute/config.yaml" in result.output
 
 
 def test_init_output_leaves_choice_automatic():
@@ -50,7 +50,7 @@ def test_models_without_config_uses_default_orchestrator(monkeypatch):
     monkeypatch.setattr(catalog, "list_chat_models", lambda p: ["claude-haiku-5-5"])
     result = runner.invoke(app, ["models"])
     assert result.exit_code == 0
-    assert "Orchestrateur : anthropic:claude-haiku-5-5" in result.output
+    assert "Orchestrator: anthropic:claude-haiku-5-5" in result.output
 
 
 def test_models_shows_key_sources_without_values(monkeypatch):
@@ -84,7 +84,7 @@ def test_models_with_unreadable_config_warns_in_one_line(monkeypatch):
     result = runner.invoke(app, ["models"])
     assert_clean(result)
     assert result.exit_code == 0
-    assert "Attention : .autoroute/config.yaml illisible (YAML invalide, ligne 2)" in result.output
+    assert "Warning: .autoroute/config.yaml is unreadable (invalid YAML, line 2)" in result.output
     assert "UserWarning" not in result.output
 
 
@@ -96,7 +96,7 @@ def test_models_unexpected_error_is_clean(monkeypatch):
     result = runner.invoke(app, ["models"])
     assert_clean(result)
     assert result.exit_code == 1
-    assert "Erreur inattendue (RuntimeError) : imprévu" in result.output
+    assert "Unexpected error (RuntimeError): imprévu" in result.output
 
 
 def test_models_invalid_mode_is_clean(monkeypatch):
@@ -104,14 +104,14 @@ def test_models_invalid_mode_is_clean(monkeypatch):
     result = runner.invoke(app, ["models"])
     assert_clean(result)
     assert result.exit_code == 1
-    assert "Erreur : AUTOROUTE_MODE doit valoir" in result.output
+    assert "Error: AUTOROUTE_MODE must be one of" in result.output
 
 
 def test_init_rejects_orchestrator_without_provider():
     result = runner.invoke(app, ["init", "-o", "gpt-4o-mini"])
     assert_clean(result)
     assert result.exit_code == 1
-    assert "fournisseur:nom" in result.output
+    assert "provider:name" in result.output
     assert not CONFIG.exists()
 
 
@@ -124,5 +124,20 @@ def test_route_shows_orchestrator_failure_once(monkeypatch):
     monkeypatch.setattr("autoroute.router.init_chat_model", boom)
     result = runner.invoke(app, ["route", "Dis bonjour"])
     assert result.exit_code == 0
-    assert result.output.count("Attention : Aucun orchestrateur n'a répondu") == 1
-    assert "Modèle : " in result.output
+    assert result.output.count("Warning: No orchestrator answered") == 1
+    assert "Model: " in result.output
+
+
+def test_route_shows_route_fields(monkeypatch, fake_llm):
+    from autoroute.router import Decision
+
+    monkeypatch.setattr(catalog, "list_chat_models", lambda p: [f"{p}-mini", f"{p}-large"])
+    fake_llm(Decision(choices=["openai:openai-large", "anthropic:anthropic-mini"], reason="Code"))
+    result = runner.invoke(app, ["route", "Écris du code"])
+    assert_clean(result)
+    assert result.exit_code == 0
+    assert "Model:     openai:openai-large" in result.output
+    assert "Fallbacks: anthropic:anthropic-mini" in result.output
+    assert "Reason:    Code" in result.output
+    assert "Routed:    yes" in result.output
+    assert "Warning" not in result.output

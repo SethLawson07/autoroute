@@ -2,7 +2,7 @@ from langchain.agents import create_agent
 from langchain.agents.middleware import ModelFallbackMiddleware
 from langchain.tools import tool
 
-from autoroute import route_with_reason
+from autoroute import route
 
 
 @tool
@@ -13,20 +13,15 @@ def get_weather(city: str) -> str:
 
 task = "Quel temps fait-il à Paris ?"
 
-r = route_with_reason(task)
-primary, *backups = r.candidates
+r = route(task)
 
 agent = create_agent(
-    model=primary,
+    model=r.model,
     tools=[get_weather],
     system_prompt="Tu es un assistant utile.",
     # If the primary model fails, the agent retries with the fallback models, in order.
-    middleware=[ModelFallbackMiddleware(*backups)] if backups else [],
+    middleware=[ModelFallbackMiddleware(*r.fallbacks)] if r.fallbacks else [],
 )
 
-# The tracker logs which model actually answered, the fallbacks used and the tokens.
-result = agent.invoke(
-    {"messages": [{"role": "user", "content": task}]},
-    config={"callbacks": [r.tracker()]},
-)
+result = agent.invoke({"messages": [{"role": "user", "content": task}]})
 print(result["messages"][-1].content)
