@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "autoroute-ai"  # nom PyPI (« autoroute » y est bloqué, trop proche de « auto-route ») ; import : autoroute
-version = "0.1.1"
+version = "0.2.0"
 description = "Choisit automatiquement le bon modèle LLM pour une tâche"
 readme = "README.en.md"  # PyPI : version anglaise ; GitHub affiche README.md (français)
 license = "MIT"
