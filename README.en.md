@@ -4,7 +4,7 @@
 
 **Bring your API keys. Autoroute picks the model.**
 
-You give Autoroute your prompt, that is, the task to perform. It picks the most suitable model among those **your API keys can access**, returns its name and tells you why. You don't need to know which model to use for what.
+You give Autoroute your prompt, that is, the task to perform. It picks the sufficient model (the lightest one able to do it without losing quality) among those **your API keys can access**, returns its name and tells you why. You don't need to know which model to use for what.
 
 ```python
 from langchain.chat_models import init_chat_model
@@ -29,7 +29,7 @@ Autoroute does **not** call the model: it returns an object whose `r.model` is t
 ![How Autoroute works](https://raw.githubusercontent.com/SethLawson07/autoroute/main/assets/how-it-works.en.svg)
 
 1. **Discovery**: Autoroute queries the model-listing API of every provider whose key is set, and keeps the chat models. There is no model list to maintain. The list is kept in memory for 5 minutes: later `route()` calls don't fetch it again.
-2. **Routing**: an **orchestrator**, a lightweight model picked automatically among your models to keep routing fast and cheap (or the one you choose in `.autoroute/config.yaml`), receives your prompt and that list. It returns the most suitable model, up to 2 fallbacks, and the reason for its choice. Its answer is restricted to the discovered models.
+2. **Routing**: an **orchestrator**, a lightweight model picked automatically among your models to keep routing fast and cheap (or the one you choose in `.autoroute/config.yaml`), receives your prompt and that list. It returns the sufficient model for the task, up to 2 fallbacks, and the reason for its choice. Its answer is restricted to the discovered models.
 3. **Logging**: every decision is written to a JSONL log.
 
 ## Installation

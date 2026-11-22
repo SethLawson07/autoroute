@@ -4,7 +4,7 @@
 
 **Apporte tes clés API. Autoroute choisit le modèle.**
 
-Tu donnes à Autoroute ton prompt, c'est-à-dire la tâche à accomplir. Il choisit le modèle le plus adapté parmi ceux auxquels **tes clés API donnent accès**, te renvoie son nom et te dit pourquoi. Tu n'as pas à savoir quel modèle utiliser pour quoi.
+Tu donnes à Autoroute ton prompt, c'est-à-dire la tâche à accomplir. Il choisit le modèle suffisant (le plus léger capable de la réussir sans perte de qualité) parmi ceux auxquels **tes clés API donnent accès**, te renvoie son nom et te dit pourquoi. Tu n'as pas à savoir quel modèle utiliser pour quoi.
 
 ```python
 from langchain.chat_models import init_chat_model
@@ -29,7 +29,7 @@ Autoroute n'appelle **pas** le modèle : il te renvoie un objet dont `r.model` e
 ![Comment fonctionne Autoroute](assets/how-it-works.fr.svg)
 
 1. **Découverte** : Autoroute interroge l'API de liste des modèles de chaque fournisseur dont la clé est renseignée, et garde les modèles de chat. Il n'y a aucune liste de modèles à maintenir. La liste est gardée en mémoire 5 minutes : les appels suivants à `route()` ne la redemandent pas.
-2. **Routage** : un **orchestrateur**, modèle léger choisi automatiquement parmi tes modèles pour que le routage reste rapide et peu coûteux (ou celui que tu choisis dans `.autoroute/config.yaml`), reçoit ton prompt et cette liste. Il renvoie le modèle le plus adapté, jusqu'à 2 replis, et la raison de son choix. Sa réponse est limitée aux modèles découverts.
+2. **Routage** : un **orchestrateur**, modèle léger choisi automatiquement parmi tes modèles pour que le routage reste rapide et peu coûteux (ou celui que tu choisis dans `.autoroute/config.yaml`), reçoit ton prompt et cette liste. Il renvoie le modèle suffisant pour la tâche, jusqu'à 2 replis, et la raison de son choix. Sa réponse est limitée aux modèles découverts.
 3. **Log** : chaque décision est écrite dans un log JSONL.
 
 ## Installation
